@@ -76,3 +76,25 @@ inline void applyReceiverFailsafe(ReceiverControlState &state) {
   state.connected = false;
   state.failsafeActive = true;
 }
+
+inline bool shouldEmitReceiverLinkAlert(
+  bool connected,
+  bool failsafeActive,
+  uint32_t nowMs,
+  uint32_t &lastAlertMs,
+  bool &hasAlerted,
+  uint32_t intervalMs
+) {
+  if (connected && !failsafeActive) {
+    hasAlerted = false;
+    return false;
+  }
+
+  if (!hasAlerted || nowMs - lastAlertMs >= intervalMs) {
+    lastAlertMs = nowMs;
+    hasAlerted = true;
+    return true;
+  }
+
+  return false;
+}

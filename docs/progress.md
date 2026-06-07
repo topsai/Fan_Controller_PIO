@@ -173,3 +173,37 @@
 ### 硬件复测状态
 
 已抓取接收端日志，但本轮未触发 failsafe；日志显示接收端仍持续收到发射端数据。需要在下一轮测试中确保发射端真正断电或断开发射端供电超过 3 秒。
+
+## 2026-06-07 接收端链路异常周期提示音
+
+### 目标
+
+遥控器未打开、断电或失效时，接收端每隔 2 秒发出一次提示音。
+
+### 已完成
+
+- 新增 `shouldEmitReceiverLinkAlert()`，控制链路异常提示音节流。
+- 接收端新增参数：
+  - `LINK_ALERT_INTERVAL=2000`
+  - `LINK_ALERT_BEEP_MS=200`
+- 接收端在 `!connected` 或 `failsafeActive` 时，每 2 秒蜂鸣 200ms。
+- 连接正常且非 failsafe 时不发出该周期提示音。
+- 新增单元测试：
+  - `test_receiver_link_alert_beeps_immediately_then_every_two_seconds`
+  - `test_receiver_link_alert_is_silent_when_connected_and_not_failsafe`
+- 新固件已上传：
+  - COM3：发射端
+  - COM10：接收端
+
+### 验证
+
+- `pio test -e native`：8/8 PASS。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e receiver`：SUCCESS。
+- `pio run -e transmitter -t upload --upload-port COM3`：SUCCESS。
+- `pio run -e receiver -t upload --upload-port COM10`：SUCCESS。
+- 在线状态抓取接收端 10 秒，未出现“遥控器未连接，接收端提示音”，符合连接正常时静默要求。
+
+### 硬件复测状态
+
+离线断电抓取 12 秒未触发提示音，日志显示接收端仍持续收到发射端数据。下一轮需要确保发射端真正断电或断开发射端供电后再复测。

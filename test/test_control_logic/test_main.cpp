@@ -52,6 +52,27 @@ void test_receiver_failsafe_clears_all_stale_control_inputs() {
   TEST_ASSERT_TRUE(state.failsafeActive);
 }
 
+void test_receiver_link_alert_beeps_immediately_then_every_two_seconds() {
+  uint32_t lastAlertMs = 0;
+  bool hasAlerted = false;
+
+  TEST_ASSERT_TRUE(shouldEmitReceiverLinkAlert(false, true, 0, lastAlertMs, hasAlerted, 2000));
+  TEST_ASSERT_EQUAL_UINT32(0, lastAlertMs);
+  TEST_ASSERT_TRUE(hasAlerted);
+  TEST_ASSERT_FALSE(shouldEmitReceiverLinkAlert(false, true, 1999, lastAlertMs, hasAlerted, 2000));
+  TEST_ASSERT_TRUE(shouldEmitReceiverLinkAlert(false, true, 2000, lastAlertMs, hasAlerted, 2000));
+  TEST_ASSERT_EQUAL_UINT32(2000, lastAlertMs);
+}
+
+void test_receiver_link_alert_is_silent_when_connected_and_not_failsafe() {
+  uint32_t lastAlertMs = 0;
+  bool hasAlerted = true;
+
+  TEST_ASSERT_FALSE(shouldEmitReceiverLinkAlert(true, false, 5000, lastAlertMs, hasAlerted, 2000));
+  TEST_ASSERT_EQUAL_UINT32(0, lastAlertMs);
+  TEST_ASSERT_FALSE(hasAlerted);
+}
+
 void setup() {
   UNITY_BEGIN();
   RUN_TEST(test_pwm_mapping_uses_vesc_servo_range);
@@ -60,6 +81,8 @@ void setup() {
   RUN_TEST(test_joystick_mapping_uses_calibrated_center_and_deadzone);
   RUN_TEST(test_joystick_center_calibration_averages_samples);
   RUN_TEST(test_receiver_failsafe_clears_all_stale_control_inputs);
+  RUN_TEST(test_receiver_link_alert_beeps_immediately_then_every_two_seconds);
+  RUN_TEST(test_receiver_link_alert_is_silent_when_connected_and_not_failsafe);
   UNITY_END();
 }
 

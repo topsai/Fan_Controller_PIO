@@ -31,6 +31,8 @@
 #define TELEMETRY_RATE_HZ 20
 #define BATTERY_READ_HZ 5
 #define FAILSAFE_TIMEOUT 2000
+#define LINK_ALERT_INTERVAL 2000
+#define LINK_ALERT_BEEP_MS 200
 
 VescUart VESC;
 
@@ -87,6 +89,8 @@ float batteryVoltage = 0.0;
 uint16_t batteryVoltageX100 = 0;
 bool failsafeActive = false;
 uint32_t failsafeBeepUntil = 0;
+uint32_t lastLinkAlertTime = 0;
+bool linkAlertHasFired = false;
 
 const int pwmChannels[] = { 0, 1, 2, 3 };
 
@@ -280,6 +284,14 @@ void checkFailsafe() {
   }
 }
 
+void updateLinkAlert() {
+  if (shouldEmitReceiverLinkAlert(connected, failsafeActive, millis(), lastLinkAlertTime, linkAlertHasFired, LINK_ALERT_INTERVAL)) {
+    Serial.println("遥控器未连接，接收端提示音");
+    beep(LINK_ALERT_BEEP_MS);
+    failsafeBeepUntil = millis() + LINK_ALERT_BEEP_MS;
+  }
+}
+
 // ========== 电池检测 ==========
 void readBattery() {
   // long sum = 0;
@@ -357,6 +369,7 @@ void setup() {
 void loop() {
   static uint32_t lastVescRead = 0;
   checkFailsafe();
+  updateLinkAlert();
   updateMotors();
 
   // 按钮2控制蜂鸣器（按下响，松开停）
