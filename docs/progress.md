@@ -118,3 +118,21 @@
 1. 安装并登录 GitHub CLI。
 2. 确认 GitHub 仓库名或远程 URL。
 3. 初始化本地 git 仓库，做首次提交并推送。
+
+## 2026-06-07 GitHub 首次推送确认
+
+### 目标
+
+确认项目已经通过 VSCode 推送到 GitHub，并更新流程文档中的 GitHub 状态。
+
+### 已完成
+
+- 确认当前目录已经是 git 仓库。
+- 确认远程仓库为 `https://github.com/topsai/Fan_Controller_PIO.git`。
+- 确认本地 `main` 跟踪 `origin/main`。
+- 确认当前提交为 `f9ef724 first commit`。
+- 更新 `docs/workflow.md`，移除“尚未初始化 git 仓库”的阻塞说明。
+
+### 当前状态
+
+本地 `main` 已连接 `origin/main`。后续更新应按 `docs/workflow.md` 执行测试、文档、上传固件、提交并推送。

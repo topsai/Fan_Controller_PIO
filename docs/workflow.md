@@ -59,10 +59,14 @@ git push
 - [ ] 测试结果已写入 `docs/test-runs/`。
 - [ ] 本地提交已推送到 GitHub。
 
-## 4. 当前阻塞
+## 4. GitHub 状态
 
-本项目目录当前尚未初始化 git 仓库，且本机尚未安装 GitHub CLI `gh`。首次上传 GitHub 前需要完成：
+项目已通过 VSCode 推送到 GitHub。
 
-1. 安装 GitHub CLI。
-2. 执行 `gh auth login` 登录。
-3. 确认要创建或推送到的 GitHub 仓库，例如 `owner/Fan_Controller_PIO`。
+| 项目 | 值 |
+|---|---|
+| 远程名 | `origin` |
+| 远程地址 | `https://github.com/topsai/Fan_Controller_PIO.git` |
+| 默认分支 | `main` |
+
+后续每次完成测试、文档和固件上传后，需要把本地提交推送到 `origin/main`。
