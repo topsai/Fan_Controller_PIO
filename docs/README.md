@@ -7,6 +7,7 @@
 | 文件 | 用途 |
 |---|---|
 | `requirements.md` | 完整需求规格书，作为当前功能基线 |
+| `user-guide.md` | 日常使用方法、功能说明、提示音、测试和上传命令 |
 | `hardware.md` | 硬件清单、引脚定义、接线说明 |
 | `protocol.md` | ESP-NOW 数据包、字段、校验和、MAC 绑定 |
 | `state-machines.md` | 发射端和接收端状态机 |
