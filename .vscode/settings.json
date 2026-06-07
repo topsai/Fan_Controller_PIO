@@ -1,0 +1,6 @@
+{
+  "C_Cpp.default.compileCommands": "${workspaceFolder}/compile_commands.json",
+  "C_Cpp.default.configurationProvider": "",
+  "C_Cpp.default.compilerPath": "C:/Users/John/.platformio/packages/toolchain-riscv32-esp@8.4.0+2021r2-patch5/bin/riscv32-esp-elf-g++.exe",
+  "C_Cpp.intelliSenseEngine": "default"
+}
