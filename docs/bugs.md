@@ -22,6 +22,7 @@
 | BUG-006 | Fixed | Medium | PlatformIO 下 ESP32-C3 应用层串口日志不可见 | 原因是 `esp32-c3-devkitm-1` 板卡配置未默认启用 USB CDC；已在 `platformio.ini` 增加 `ARDUINO_USB_MODE=1` 和 `ARDUINO_USB_CDC_ON_BOOT=1` | 重新上传后 COM3/COM10 能看到应用层启动日志 |
 | BUG-007 | Watch | Low | 发射端启动时出现一次 LEDC warning | 日志为 `ledc_get_duty(...): LEDC is not initialized`，出现在启动提示音附近；目前未阻止系统运行 | 后续检查 `tone()` 在 ESP32-C3 上的初始化行为 |
 | BUG-008 | Fixed | Medium | 接收端失控蜂鸣可能被按钮逻辑立即打断 | `checkFailsafe()` 启动 1000ms 蜂鸣后，按钮 2 逻辑不再立即 `noTone()` 打断该提示音 | 上板断开发射端，确认接收端失控提示音持续约 1 秒 |
+| BUG-009 | Fixed | High | 遥控器断电后接收端可能继续使用断联前控制状态 | 根因是 failsafe 只清零 throttle，没有统一清理 speedLevel、buttons、connected；已新增 `applyReceiverFailsafe()`，进入 failsafe 后清为 throttle=0、speedLevel=1、buttons=0、connected=false、failsafeActive=true | 单元测试覆盖；硬件断电复测待完成 |
 
 ## 新 bug 记录模板
 

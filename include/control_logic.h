@@ -60,3 +60,19 @@ inline int calibratedJoystickCenter(const int *samples, size_t sampleCount, int 
   }
   return (int)((sum + (long)sampleCount / 2) / (long)sampleCount);
 }
+
+struct ReceiverControlState {
+  int16_t throttle;
+  uint8_t speedLevel;
+  uint8_t buttons;
+  bool connected;
+  bool failsafeActive;
+};
+
+inline void applyReceiverFailsafe(ReceiverControlState &state) {
+  state.throttle = 0;
+  state.speedLevel = 1;
+  state.buttons = 0;
+  state.connected = false;
+  state.failsafeActive = true;
+}

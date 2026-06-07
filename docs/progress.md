@@ -136,3 +136,40 @@
 ### 当前状态
 
 本地 `main` 已连接 `origin/main`。后续更新应按 `docs/workflow.md` 执行测试、文档、上传固件、提交并推送。
+
+## 2026-06-07 接收端断联安全状态修复
+
+### 目标
+
+修复遥控器突然失效或断电后，接收端继续沿用断联前控制数据的风险。
+
+### 根因
+
+接收端原 `checkFailsafe()` 只设置 `throttle=0` 和 `failsafeActive=true`，没有统一清理 `speedLevel`、`buttons`、`connected` 等状态。因此断联前的按钮或档位状态可能继续影响接收端逻辑。
+
+### 已完成
+
+- 新增 `ReceiverControlState` 和 `applyReceiverFailsafe()`。
+- failsafe 状态统一设置为：
+  - `throttle=0`
+  - `speedLevel=1`
+  - `buttons=0`
+  - `connected=false`
+  - `failsafeActive=true`
+- 接收端 `checkFailsafe()` 已接入该安全状态函数。
+- 新增单元测试 `test_receiver_failsafe_clears_all_stale_control_inputs`。
+- 新固件已上传：
+  - COM3：发射端
+  - COM10：接收端
+
+### 验证
+
+- `pio test -e native`：6/6 PASS。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e receiver`：SUCCESS。
+- `pio run -e transmitter -t upload --upload-port COM3`：SUCCESS。
+- `pio run -e receiver -t upload --upload-port COM10`：SUCCESS。
+
+### 硬件复测状态
+
+已抓取接收端日志，但本轮未触发 failsafe；日志显示接收端仍持续收到发射端数据。需要在下一轮测试中确保发射端真正断电或断开发射端供电超过 3 秒。

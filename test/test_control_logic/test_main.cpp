@@ -34,6 +34,24 @@ void test_joystick_center_calibration_averages_samples() {
   TEST_ASSERT_EQUAL_INT(2100, calibratedJoystickCenter(samples, 4, 2048));
 }
 
+void test_receiver_failsafe_clears_all_stale_control_inputs() {
+  ReceiverControlState state = {
+    800,
+    3,
+    0x03,
+    true,
+    false,
+  };
+
+  applyReceiverFailsafe(state);
+
+  TEST_ASSERT_EQUAL_INT(0, state.throttle);
+  TEST_ASSERT_EQUAL_UINT8(1, state.speedLevel);
+  TEST_ASSERT_EQUAL_UINT8(0, state.buttons);
+  TEST_ASSERT_FALSE(state.connected);
+  TEST_ASSERT_TRUE(state.failsafeActive);
+}
+
 void setup() {
   UNITY_BEGIN();
   RUN_TEST(test_pwm_mapping_uses_vesc_servo_range);
@@ -41,6 +59,7 @@ void setup() {
   RUN_TEST(test_pwm_mapping_defaults_invalid_speed_level_to_level_1);
   RUN_TEST(test_joystick_mapping_uses_calibrated_center_and_deadzone);
   RUN_TEST(test_joystick_center_calibration_averages_samples);
+  RUN_TEST(test_receiver_failsafe_clears_all_stale_control_inputs);
   UNITY_END();
 }
 

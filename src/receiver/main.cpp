@@ -257,8 +257,19 @@ void updateMotors() {
 // ========== 失控保护 ==========
 void checkFailsafe() {
   if (millis() - lastRecvTime > FAILSAFE_TIMEOUT && !failsafeActive) {
-    failsafeActive = true;
-    throttle = 0;
+    ReceiverControlState safeState = {
+      throttle,
+      speedLevel,
+      buttons,
+      connected,
+      failsafeActive,
+    };
+    applyReceiverFailsafe(safeState);
+    throttle = safeState.throttle;
+    speedLevel = safeState.speedLevel;
+    buttons = safeState.buttons;
+    connected = safeState.connected;
+    failsafeActive = safeState.failsafeActive;
     failsafeBeepUntil = millis() + 1000;
     Serial.println("失控保护启动！");
     beep(1000);
