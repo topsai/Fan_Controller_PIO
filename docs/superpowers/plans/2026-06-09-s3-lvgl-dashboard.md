@@ -60,8 +60,8 @@ Call `lv_tick_inc()` and `lv_timer_handler()` from the Arduino loop.
 
 Document that the formal S3 transmitter now uses LVGL 8.3.11, while `s3_lvgl_probe` remains a LovyanGFX hardware probe.
 
-- [ ] **Step 2: Build, upload if possible, commit, push**
+- [x] **Step 2: Build, upload if possible, commit, push**
 
 Run builds/tests, try COM7 upload, then commit only the LVGL-related changes and push to GitHub.
 
-Status: builds and native tests passed. COM7 upload failed because Windows denied access to the port.
+Status: builds and native tests passed. COM7 upload failed because Windows denied access to the port. LVGL changes were committed and pushed to GitHub.
