@@ -54,3 +54,32 @@
 - C3 发射器和接收器已被用户拔掉，本轮可能无法上传 COM3 / COM10。
 - LSM6DSLTR 暂不纳入正式功能闭环。
 - 本轮 `s3_transmitter` 固件已成功编译，但尚未烧录到 S3；需要释放 COM7 后重新上传。
+
+## LVGL 8.3.11 集成复测
+
+### 本次变更
+
+- 正式 `s3_transmitter` 加入 `lvgl/lvgl@8.3.11`。
+- 新增 `include/lv_conf.h`，并通过 `-DLV_CONF_INCLUDE_SIMPLE` 与 `-I include` 让 LVGL 库编译阶段读取项目配置。
+- LovyanGFX 继续负责 GC9A01 屏幕和 CST816 触摸底层驱动。
+- 新增 LVGL flush 回调、触摸读取回调、仪表盘标签和油门条。
+- `s3_lvgl_probe` 未加入 LVGL，仍作为 LovyanGFX 硬件探针保留。
+
+### 验证结果
+
+| 项目 | 结果 |
+|---|---|
+| `pio run -e s3_transmitter` | SUCCESS，RAM 40.3%，Flash 29.8% |
+| `pio run -e receiver` | SUCCESS |
+| `pio run -e transmitter` | SUCCESS |
+| `pio run -e s3_lvgl_probe` | SUCCESS |
+| `pio test -e native` | PASS，12/12 |
+| `pio device list` | COM1、COM7；无 COM3 / COM10 |
+| `pio run -e s3_transmitter -t upload --upload-port COM7` | FAILED，COM7 可见但被系统拒绝访问：`PermissionError(13, '拒绝访问。')` |
+
+### 待硬件确认
+
+- 释放 COM7 后重新上传正式 `s3_transmitter` 固件。
+- 目视确认 LVGL 页面是否正常显示。
+- 触摸测试：确认 LVGL 坐标仍然左右/上下跟手。
+- 如颜色红蓝异常，再检查 `LV_COLOR_16_SWAP` 或 LovyanGFX 像素推送格式。

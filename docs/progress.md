@@ -426,3 +426,34 @@
 - S3 实体摇杆、档位开关、按钮、蜂鸣器引脚尚未按最终硬件定稿，当前仅为软件占位。
 - 另外两块 C3 设备当前未接入，无法做端到端联调上传。
 - LSM6DSLTR 暂时不进入正式功能闭环。
+
+## 2026-06-09 S3 正式端加入 LVGL 8.3.11
+
+### 目标
+
+将正式 `s3_transmitter` 的界面层从 LovyanGFX 直接绘制迁移到 LVGL 8.3.11。LovyanGFX 继续作为已经验证过的屏幕和触摸底层驱动，`s3_lvgl_probe` 继续作为硬件探针项目保留。
+
+### 已完成
+
+- `s3_transmitter` 新增依赖 `lvgl/lvgl@8.3.11`。
+- 新增 `include/lv_conf.h`，配置 16-bit 色深、LVGL 内存池和当前仪表盘使用的基础控件。
+- `s3_transmitter` 新增 LVGL display flush 回调，使用现有 GC9A01/LovyanGFX 配置推送像素。
+- `s3_transmitter` 新增 LVGL touch read 回调，沿用已验证的 CST816 触摸 X 轴反向校正。
+- 原 LovyanGFX 直接绘制的状态页迁移为 LVGL 标签和油门条。
+- 主循环新增 `lv_tick_inc()` 和 `lv_timer_handler()` 调度。
+- 控制包发送、ESP-NOW 接收、传感器读取、蜂鸣器、摇杆中位校准、占位 GPIO 未改变。
+
+### 验证
+
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio run -e receiver`：SUCCESS。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e s3_lvgl_probe`：SUCCESS。
+- `pio test -e native`：PASS，12/12。
+- `pio device list`：当前仅 COM1 和 COM7，无 COM3 / COM10。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：FAILED，COM7 可见但被系统拒绝访问，错误为 `PermissionError(13, '拒绝访问。')`。
+
+### 当前限制
+
+- 正式 S3 LVGL 固件已成功编译，但尚未烧录到 S3；需要释放 COM7 后重试上传。
+- 本轮未进行屏幕目视确认，实际颜色、布局和触摸点跟手情况需要上传成功后验证。

@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <LovyanGFX.hpp>
+#include <lvgl.h>
 #include <Wire.h>
 #include <WiFi.h>
 #include <esp_now.h>
@@ -189,6 +190,27 @@ struct Qmc5883lData {
 };
 
 S3RoundDisplay display;
+constexpr uint16_t LCD_WIDTH = 240;
+constexpr uint16_t LCD_HEIGHT = 240;
+constexpr uint16_t LVGL_BUFFER_LINES = 40;
+lv_disp_draw_buf_t lvDrawBuffer;
+lv_color_t lvBuffer[LCD_WIDTH * LVGL_BUFFER_LINES];
+lv_disp_drv_t lvDisplayDriver;
+lv_indev_drv_t lvTouchDriver;
+uint32_t lastLvTickMs = 0;
+
+lv_obj_t *titleLabel = nullptr;
+lv_obj_t *statusLabel = nullptr;
+lv_obj_t *controlLabel = nullptr;
+lv_obj_t *speedLabel = nullptr;
+lv_obj_t *batteryLabel = nullptr;
+lv_obj_t *bmpLabel = nullptr;
+lv_obj_t *headingLabel = nullptr;
+lv_obj_t *buttonLabel = nullptr;
+lv_obj_t *barLabel = nullptr;
+lv_obj_t *throttleBar = nullptr;
+lv_obj_t *placeholderLabel = nullptr;
+
 Cw2015Data cw2015;
 Bmp280Data bmp280;
 Qmc5883lData qmc;
@@ -221,6 +243,13 @@ uint8_t calcChecksum(const uint8_t *data, uint8_t len) {
 
 uint16_t mapTouchX(uint16_t rawX) {
   return 239 - rawX;
+}
+
+int16_t clampTouchCoord(uint16_t value) {
+  if (value >= LCD_WIDTH) {
+    return LCD_WIDTH - 1;
+  }
+  return value;
 }
 
 bool i2cWriteReg(uint8_t addr, uint8_t reg, uint8_t value) {
@@ -479,6 +508,91 @@ void setupDisplay() {
   display.setBrightness(255);
 }
 
+void lvFlushCallback(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *colorP) {
+  const int32_t width = area->x2 - area->x1 + 1;
+  const int32_t height = area->y2 - area->y1 + 1;
+  display.startWrite();
+  display.pushImage(area->x1, area->y1, width, height, reinterpret_cast<const uint16_t *>(colorP));
+  display.endWrite();
+  lv_disp_flush_ready(disp);
+}
+
+void lvTouchReadCallback(lv_indev_drv_t *, lv_indev_data_t *data) {
+  uint16_t rawX = 0;
+  uint16_t rawY = 0;
+  if (display.getTouch(&rawX, &rawY) && rawX < LCD_WIDTH && rawY < LCD_HEIGHT) {
+    data->state = LV_INDEV_STATE_PRESSED;
+    data->point.x = clampTouchCoord(mapTouchX(rawX));
+    data->point.y = clampTouchCoord(rawY);
+    return;
+  }
+  data->state = LV_INDEV_STATE_RELEASED;
+}
+
+lv_obj_t *createDashboardLabel(int16_t x, int16_t y, lv_color_t color) {
+  lv_obj_t *label = lv_label_create(lv_scr_act());
+  lv_obj_set_pos(label, x, y);
+  lv_obj_set_style_text_color(label, color, 0);
+  lv_obj_set_style_text_font(label, &lv_font_montserrat_12, 0);
+  return label;
+}
+
+void createLvglDashboard() {
+  lv_obj_t *screen = lv_scr_act();
+  lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_bg_color(screen, lv_color_black(), 0);
+  lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
+
+  titleLabel = lv_label_create(screen);
+  lv_obj_set_style_text_color(titleLabel, lv_color_hex(0x00D8FF), 0);
+  lv_obj_set_style_text_font(titleLabel, &lv_font_montserrat_14, 0);
+  lv_label_set_text(titleLabel, "S3 REMOTE");
+  lv_obj_align(titleLabel, LV_ALIGN_TOP_MID, 0, 8);
+
+  statusLabel = createDashboardLabel(24, 30, lv_color_hex(0x00FF66));
+  controlLabel = createDashboardLabel(24, 52, lv_color_white());
+  speedLabel = createDashboardLabel(24, 72, lv_color_white());
+  batteryLabel = createDashboardLabel(24, 94, lv_color_white());
+  bmpLabel = createDashboardLabel(24, 114, lv_color_white());
+  headingLabel = createDashboardLabel(24, 134, lv_color_white());
+  buttonLabel = createDashboardLabel(24, 156, lv_color_white());
+  barLabel = createDashboardLabel(24, 178, lv_color_hex(0xC0C0C0));
+
+  throttleBar = lv_bar_create(screen);
+  lv_obj_set_size(throttleBar, 96, 10);
+  lv_obj_set_pos(throttleBar, 56, 180);
+  lv_bar_set_range(throttleBar, -1000, 1000);
+  lv_bar_set_mode(throttleBar, LV_BAR_MODE_SYMMETRICAL);
+  lv_obj_set_style_bg_color(throttleBar, lv_color_hex(0x303030), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(throttleBar, lv_color_hex(0x00C853), LV_PART_INDICATOR);
+
+  placeholderLabel = lv_label_create(screen);
+  lv_obj_set_style_text_color(placeholderLabel, lv_color_hex(0xA0A0A0), 0);
+  lv_obj_set_style_text_font(placeholderLabel, &lv_font_montserrat_10, 0);
+  lv_label_set_text(placeholderLabel, "pins are placeholders");
+  lv_obj_align(placeholderLabel, LV_ALIGN_BOTTOM_MID, 0, -18);
+}
+
+void setupLvgl() {
+  lv_init();
+  lv_disp_draw_buf_init(&lvDrawBuffer, lvBuffer, nullptr, LCD_WIDTH * LVGL_BUFFER_LINES);
+
+  lv_disp_drv_init(&lvDisplayDriver);
+  lvDisplayDriver.hor_res = LCD_WIDTH;
+  lvDisplayDriver.ver_res = LCD_HEIGHT;
+  lvDisplayDriver.flush_cb = lvFlushCallback;
+  lvDisplayDriver.draw_buf = &lvDrawBuffer;
+  lv_disp_drv_register(&lvDisplayDriver);
+
+  lv_indev_drv_init(&lvTouchDriver);
+  lvTouchDriver.type = LV_INDEV_TYPE_POINTER;
+  lvTouchDriver.read_cb = lvTouchReadCallback;
+  lv_indev_drv_register(&lvTouchDriver);
+
+  createLvglDashboard();
+  lastLvTickMs = millis();
+}
+
 void setupEspNow() {
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
@@ -562,65 +676,52 @@ void updateBatteryAlert() {
   }
 }
 
-void drawDashboard() {
-  display.fillScreen(TFT_BLACK);
-  display.drawCircle(120, 120, 118, connected ? TFT_GREEN : TFT_RED);
-  display.setTextDatum(top_left);
-  display.setTextSize(1);
+void updateDashboard() {
+  char buffer[48] = {};
 
-  display.setTextColor(TFT_CYAN, TFT_BLACK);
-  display.setCursor(58, 8);
-  display.print("S3 REMOTE");
-
-  display.setTextColor(connected ? TFT_GREEN : TFT_RED, TFT_BLACK);
-  display.setCursor(24, 28);
+  lv_obj_set_style_text_color(statusLabel, connected ? lv_color_hex(0x00FF66) : lv_color_hex(0xFF4040), 0);
   if (connected) {
-    display.printf("OK  VESC %.2fV", receiverVoltageX100 / 100.0f);
+    snprintf(buffer, sizeof(buffer), "OK  VESC %.2fV", receiverVoltageX100 / 100.0f);
   } else {
-    display.print("LOST");
+    snprintf(buffer, sizeof(buffer), "LOST");
   }
+  lv_label_set_text(statusLabel, buffer);
 
-  display.setTextColor(TFT_WHITE, TFT_BLACK);
-  display.setCursor(24, 50);
-  display.printf("SPD %u  THR %d", speedLevel, joystickValue);
+  snprintf(buffer, sizeof(buffer), "SPD %u  THR %d", speedLevel, joystickValue);
+  lv_label_set_text(controlLabel, buffer);
 
-  display.setCursor(24, 70);
-  display.printf("SPEED %u KM", receiverSpeed);
+  snprintf(buffer, sizeof(buffer), "SPEED %u KM", receiverSpeed);
+  lv_label_set_text(speedLabel, buffer);
 
-  display.setCursor(24, 92);
   if (cw2015.valid) {
-    display.printf("BAT %.2fV %.1f%%", cw2015.voltage, cw2015.soc);
+    snprintf(buffer, sizeof(buffer), "BAT %.2fV %.1f%%", cw2015.voltage, cw2015.soc);
   } else {
-    display.print("BAT N/A");
+    snprintf(buffer, sizeof(buffer), "BAT N/A");
   }
+  lv_label_set_text(batteryLabel, buffer);
 
-  display.setCursor(24, 112);
   if (bmp280.valid) {
-    display.printf("BMP %.1fC %.0fhPa", bmp280.temperatureC, bmp280.pressureHpa);
+    snprintf(buffer, sizeof(buffer), "BMP %.1fC %.0fhPa", bmp280.temperatureC, bmp280.pressureHpa);
   } else {
-    display.print("BMP N/A");
+    snprintf(buffer, sizeof(buffer), "BMP N/A");
   }
+  lv_label_set_text(bmpLabel, buffer);
 
-  display.setCursor(24, 132);
   if (qmc.valid) {
-    display.printf("HDG %.0fdeg", qmc.headingDeg);
+    snprintf(buffer, sizeof(buffer), "HDG %.0fdeg", qmc.headingDeg);
   } else {
-    display.print("HDG N/A");
+    snprintf(buffer, sizeof(buffer), "HDG N/A");
   }
+  lv_label_set_text(headingLabel, buffer);
 
-  display.setCursor(24, 154);
-  display.printf("BTN %02X RSSI %d", buttonState, rssiValue);
+  snprintf(buffer, sizeof(buffer), "BTN %02X RSSI %d", buttonState, rssiValue);
+  lv_label_set_text(buttonLabel, buffer);
 
-  const char *direction = joystickValue >= 0 ? "THR" : "BRK";
-  const int barWidth = map(abs(joystickValue), 0, 1000, 0, 92);
-  display.setCursor(24, 176);
-  display.print(direction);
-  display.drawRect(52, 174, 96, 10, TFT_DARKGREY);
-  display.fillRect(54, 176, barWidth, 6, joystickValue >= 0 ? TFT_GREEN : TFT_ORANGE);
-
-  display.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-  display.setCursor(46, 208);
-  display.print("pins are placeholders");
+  lv_label_set_text(barLabel, joystickValue >= 0 ? "THR" : "BRK");
+  lv_obj_set_style_bg_color(throttleBar,
+                            joystickValue >= 0 ? lv_color_hex(0x00C853) : lv_color_hex(0xFF9800),
+                            LV_PART_INDICATOR);
+  lv_bar_set_value(throttleBar, joystickValue, LV_ANIM_OFF);
 }
 
 }  // namespace
@@ -634,6 +735,7 @@ void setup() {
   setupPins();
   calibrateJoystickCenter();
   setupDisplay();
+  setupLvgl();
   initLocalSensors();
   readLocalSensors();
   setupEspNow();
@@ -641,13 +743,19 @@ void setup() {
   beep(BEEP_FREQ_STARTUP, 100);
   delay(120);
   beep(BEEP_FREQ_STARTUP, 100);
-  drawDashboard();
+  updateDashboard();
 }
 
 void loop() {
   readInputs();
 
   const uint32_t now = millis();
+  const uint32_t lvElapsedMs = now - lastLvTickMs;
+  if (lvElapsedMs > 0) {
+    lv_tick_inc(lvElapsedMs);
+    lastLvTickMs = now;
+  }
+
   if (now - lastControlMs >= CONTROL_INTERVAL_MS) {
     lastControlMs = now;
     sendControlPacket();
@@ -663,8 +771,10 @@ void loop() {
 
   if (now - lastDisplayMs >= DISPLAY_INTERVAL_MS) {
     lastDisplayMs = now;
-    drawDashboard();
+    updateDashboard();
   }
+
+  lv_timer_handler();
 
   if (now - lastDebugMs >= 1000) {
     lastDebugMs = now;
