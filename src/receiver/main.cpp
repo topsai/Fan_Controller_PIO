@@ -33,6 +33,7 @@
 #define FAILSAFE_TIMEOUT 2000
 #define LINK_ALERT_INTERVAL 2000
 #define LINK_ALERT_BEEP_MS 200
+#define REMOTE_HORN_MAX_MS 3000
 
 VescUart VESC;
 
@@ -91,6 +92,9 @@ bool failsafeActive = false;
 uint32_t failsafeBeepUntil = 0;
 uint32_t lastLinkAlertTime = 0;
 bool linkAlertHasFired = false;
+uint32_t remoteHornStartTime = 0;
+bool remoteHornActive = false;
+bool remoteHornTimeoutReported = false;
 
 const int pwmChannels[] = { 0, 1, 2, 3 };
 
@@ -292,6 +296,23 @@ void updateLinkAlert() {
   }
 }
 
+bool updateRemoteHorn() {
+  const bool requested = buttons & 0x02;
+  const bool allowed = shouldAllowRemoteHorn(requested, millis(), remoteHornStartTime, remoteHornActive, REMOTE_HORN_MAX_MS);
+
+  if (!requested) {
+    remoteHornTimeoutReported = false;
+    return false;
+  }
+
+  if (!allowed && !remoteHornTimeoutReported) {
+    remoteHornTimeoutReported = true;
+    Serial.println("远程蜂鸣超时保护，已停止");
+  }
+
+  return allowed;
+}
+
 // ========== 电池检测 ==========
 void readBattery() {
   // long sum = 0;
@@ -373,7 +394,7 @@ void loop() {
   updateMotors();
 
   // 按钮2控制蜂鸣器（按下响，松开停）
-  if (buttons & 0x02) {
+  if (updateRemoteHorn()) {
     tone(BUZZER_PIN, 2000);  // 持续响，不指定时长
   } else if (failsafeActive && millis() < failsafeBeepUntil) {
     // 失控提示音由 checkFailsafe() 启动，这里避免被按钮逻辑立即打断。

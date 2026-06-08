@@ -24,6 +24,7 @@
 | BUG-008 | Fixed | Medium | 接收端失控蜂鸣可能被按钮逻辑立即打断 | `checkFailsafe()` 启动 1000ms 蜂鸣后，按钮 2 逻辑不再立即 `noTone()` 打断该提示音 | 上板断开发射端，确认接收端失控提示音持续约 1 秒 |
 | BUG-009 | Fixed | High | 遥控器断电后接收端可能继续使用断联前控制状态 | 根因是 failsafe 只清零 throttle，没有统一清理 speedLevel、buttons、connected；已新增 `applyReceiverFailsafe()`，进入 failsafe 后清为 throttle=0、speedLevel=1、buttons=0、connected=false、failsafeActive=true | 单元测试覆盖；硬件断电复测待完成 |
 | BUG-010 | Fixed | Medium | 遥控器未打开或失效时接收端缺少周期提示音 | 已新增接收端链路异常提示：未连接或 failsafe 状态下每 2 秒蜂鸣 200ms；连接正常时静默 | 单元测试覆盖节流逻辑；在线静默已验证；手动关闭发射器后接收端短促间隔滴滴声已验证 |
+| BUG-011 | Fixed | High | 接收端偶发长鸣 | 根因判断：按钮 2 远程蜂鸣使用无时长 `tone(BUZZER_PIN, 2000)`，一旦接收到异常或卡住的 `BTN:02` 状态，蜂鸣器会持续响；已增加远程蜂鸣单次最长 3000ms 的超时保护，松开按钮后可重新触发 | 单元测试覆盖远程蜂鸣 3 秒上限和松开复位；已编译并上传新固件；COM10 串口已验证 `BTN:02` 后触发超时保护日志；长时间实机观察仍建议继续记录 |
 
 ## 新 bug 记录模板
 

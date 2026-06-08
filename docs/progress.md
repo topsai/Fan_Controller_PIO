@@ -233,3 +233,36 @@
 - LED 状态。
 - 常用编译、上传、测试、串口命令。
 - 常见问题排查。
+
+## 2026-06-08 接收端偶发长鸣修复
+
+### 目标
+
+排查并修复接收端运行一段时间后蜂鸣器偶发长鸣的问题。
+
+### 根因判断
+
+接收端蜂鸣器有多条触发路径，其中启动提示、失控提示和链路异常提示都带固定时长；只有按钮 2 远程蜂鸣使用无时长 `tone(BUZZER_PIN, 2000)`。如果接收端持续识别到异常或卡住的 `BTN:02` 状态，就会一直长鸣。
+
+### 已完成
+
+- 新增 `shouldAllowRemoteHorn()`，把远程蜂鸣抽成可测试逻辑。
+- 接收端新增 `REMOTE_HORN_MAX_MS=3000`，按钮 2 单次远程蜂鸣最长 3 秒。
+- 按钮 2 松开后复位超时保护，可以再次按下重新触发。
+- 超时停止时，接收端串口输出 `远程蜂鸣超时保护，已停止`。
+- 新增单元测试：
+  - `test_remote_horn_has_maximum_continuous_duration`
+  - `test_remote_horn_resets_after_button_release`
+- 更新使用说明、测试计划和 bug 记录。
+
+### 验证
+
+- `pio test -e native`：10/10 PASS。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e receiver`：SUCCESS。
+- `pio run -e transmitter -t upload --upload-port COM3`：SUCCESS。
+- `pio run -e receiver -t upload --upload-port COM10`：SUCCESS。
+
+### 硬件复测状态
+
+新固件已上传到 COM3 和 COM10。接收端串口启动日志可见，并抓取到 `BTN:02` 后输出 `远程蜂鸣超时保护，已停止`，说明接收端已执行 3 秒远程蜂鸣超时保护。由于原始现象为约 1 小时左右偶发，仍建议后续长时间通电观察。

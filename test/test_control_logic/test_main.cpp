@@ -73,6 +73,30 @@ void test_receiver_link_alert_is_silent_when_connected_and_not_failsafe() {
   TEST_ASSERT_FALSE(hasAlerted);
 }
 
+void test_remote_horn_has_maximum_continuous_duration() {
+  uint32_t hornStartMs = 0;
+  bool hornActive = false;
+
+  TEST_ASSERT_TRUE(shouldAllowRemoteHorn(true, 1000, hornStartMs, hornActive, 3000));
+  TEST_ASSERT_TRUE(hornActive);
+  TEST_ASSERT_EQUAL_UINT32(1000, hornStartMs);
+  TEST_ASSERT_TRUE(shouldAllowRemoteHorn(true, 3999, hornStartMs, hornActive, 3000));
+  TEST_ASSERT_FALSE(shouldAllowRemoteHorn(true, 4000, hornStartMs, hornActive, 3000));
+  TEST_ASSERT_FALSE(hornActive);
+}
+
+void test_remote_horn_resets_after_button_release() {
+  uint32_t hornStartMs = 0;
+  bool hornActive = false;
+
+  TEST_ASSERT_TRUE(shouldAllowRemoteHorn(true, 1000, hornStartMs, hornActive, 3000));
+  TEST_ASSERT_FALSE(shouldAllowRemoteHorn(false, 1200, hornStartMs, hornActive, 3000));
+  TEST_ASSERT_FALSE(hornActive);
+  TEST_ASSERT_TRUE(shouldAllowRemoteHorn(true, 5000, hornStartMs, hornActive, 3000));
+  TEST_ASSERT_TRUE(hornActive);
+  TEST_ASSERT_EQUAL_UINT32(5000, hornStartMs);
+}
+
 void setup() {
   UNITY_BEGIN();
   RUN_TEST(test_pwm_mapping_uses_vesc_servo_range);
@@ -83,6 +107,8 @@ void setup() {
   RUN_TEST(test_receiver_failsafe_clears_all_stale_control_inputs);
   RUN_TEST(test_receiver_link_alert_beeps_immediately_then_every_two_seconds);
   RUN_TEST(test_receiver_link_alert_is_silent_when_connected_and_not_failsafe);
+  RUN_TEST(test_remote_horn_has_maximum_continuous_duration);
+  RUN_TEST(test_remote_horn_resets_after_button_release);
   UNITY_END();
 }
 

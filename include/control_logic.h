@@ -98,3 +98,29 @@ inline bool shouldEmitReceiverLinkAlert(
 
   return false;
 }
+
+inline bool shouldAllowRemoteHorn(
+  bool buttonPressed,
+  uint32_t nowMs,
+  uint32_t &hornStartMs,
+  bool &hornActive,
+  uint32_t maxDurationMs
+) {
+  if (!buttonPressed) {
+    hornActive = false;
+    return false;
+  }
+
+  if (!hornActive) {
+    hornActive = true;
+    hornStartMs = nowMs;
+    return true;
+  }
+
+  if (nowMs - hornStartMs >= maxDurationMs) {
+    hornActive = false;
+    return false;
+  }
+
+  return true;
+}
