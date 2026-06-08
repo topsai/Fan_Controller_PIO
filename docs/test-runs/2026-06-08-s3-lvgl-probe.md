@@ -145,3 +145,53 @@ TOUCH x=238 y=150
 待人工确认：
 
 - 左右移动后屏幕触摸点是否已经跟手。
+
+## 外设 I2C 仪表页
+
+目标：通过 ESP32-S3 的 GPIO18/GPIO19 读取外设 I2C 总线，并把 CW2015、BMP280、LSM6DSLTR、QMC5883L 数据显示到圆屏上。
+
+实现：
+
+- `Wire1.begin(18, 19, 100000)`。
+- 启动时扫描 `0x08..0x77`。
+- 屏幕显示 `S3 SENSOR DASH`。
+- 每 500ms 刷新屏幕数据。
+- 每 2s 通过 COM7 输出一次完整传感器数据。
+
+COM7 实测扫描结果：
+
+```text
+AUX I2C scan on SDA=18 SCL=19
+  found 0x0D
+  found 0x62
+  found 0x76
+CW2015 present
+BMP280 present at 0x76
+QMC5883L present
+```
+
+COM7 实测数据示例：
+
+```text
+SENS CW:1 4.167V 78.3% | BMP:1 33.74C 802.37hPa 1926m | LSM:0 | QMC:1 -743 -710 -1075 224deg
+```
+
+当前结论：
+
+- CW2015 已读通，电压和 SOC 可显示。
+- BMP280 已读通，温度、气压和估算海拔可显示。
+- QMC5883L 已读通，磁场 XYZ 和粗略航向角可显示。
+- LSM6DSLTR 当前没有在常见地址 `0x6A` / `0x6B` 响应，需后续核对实物型号、焊接、供电或地址配置。
+
+验证结果：
+
+| 项目 | 结果 |
+|---|---|
+| `pio run -e s3_lvgl_probe` | SUCCESS |
+| `pio run -e s3_lvgl_probe -t upload --upload-port COM7` | SUCCESS |
+| COM7 串口 | 扫描到 `0x0D`、`0x62`、`0x76`，三颗芯片有有效数据 |
+| `pio test -e native` | PASS，12/12 |
+| `pio run -e transmitter` | SUCCESS |
+| `pio run -e receiver` | SUCCESS |
+| `pio run -e transmitter -t upload --upload-port COM3` | SUCCESS |
+| `pio run -e receiver -t upload --upload-port COM10` | SUCCESS |
