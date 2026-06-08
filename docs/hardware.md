@@ -54,3 +54,39 @@
 3. VESC UART 接线按 TX/RX 交叉连接。
 4. I2C 总线上的 OLED 和 CW2015 地址分别为 `0x3C`、`0x62`。
 5. 当前引脚已经在原 Arduino 工程中验证可运行，迁移时不调整。
+
+## 6. ESP32-S3R8 LVGL 高级版探针硬件
+
+当前 `s3_lvgl_probe` 只用于验证 Arduino + LovyanGFX 是否能直接点亮屏幕并读取触摸，尚未接入遥控器业务逻辑。
+
+| 模块 | 说明 | 用途 |
+|---|---|---|
+| ESP32-S3R8 | 主控 | 高级版遥控器候选硬件 |
+| GC9A01 | 240x240，8080 8bit 并口 | 彩色 UI 显示 |
+| CST816 | I2C 触摸 | 触摸输入 |
+| 背光 | PWM | 屏幕亮度 |
+
+## 7. ESP32-S3R8 屏幕/触摸探针引脚
+
+| GPIO | 代码名称 | 方向 | 说明 |
+|---|---|---|---|
+| GPIO6 | `LCD_D0` | 输出 | LCD 8080 数据 0 |
+| GPIO12 | `LCD_D1` | 输出 | LCD 8080 数据 1 |
+| GPIO5 | `LCD_D2` | 输出 | LCD 8080 数据 2 |
+| GPIO11 | `LCD_D3` | 输出 | LCD 8080 数据 3 |
+| GPIO4 | `LCD_D4` | 输出 | LCD 8080 数据 4 |
+| GPIO10 | `LCD_D5` | 输出 | LCD 8080 数据 5 |
+| GPIO3 | `LCD_D6` | 输出 | LCD 8080 数据 6 |
+| GPIO9 | `LCD_D7` | 输出 | LCD 8080 数据 7 |
+| GPIO7 | `LCD_WR` | 输出 | LCD 8080 写时钟 |
+| GPIO14 | `LCD_CS` | 输出 | LCD 片选 |
+| GPIO13 | `LCD_DC` | 输出 | LCD 命令/数据 |
+| GPIO8 | `LCD_RST` | 输入上拉 | 当前按原 ESP-IDF 工程处理，软件复位禁用 |
+| GPIO45 | `LCD_BL` | PWM 输出 | LCD 背光 |
+| GPIO41 | `LCD_POWER` | 输出 | LCD 电源使能 |
+| GPIO47 | `LCD_TE` | 输入 | 当前探针未使用 |
+| GPIO15 | `TP_SDA` | I2C SDA | CST816 触摸 |
+| GPIO16 | `TP_SCL` | I2C SCL | CST816 触摸 |
+| GPIO17 | `TP_INT` | 输入 | CST816 触摸中断 |
+
+注意：这些屏幕引脚会占用原 C3 遥控器的多个 GPIO，因此高级版遥控器的摇杆、按钮、档位、CW2015 和蜂鸣器必须重新规划 S3 引脚。

@@ -320,3 +320,34 @@
 - `pio run -e transmitter -t upload --upload-port COM3`：SUCCESS。
 - `pio run -e receiver -t upload --upload-port COM10`：SUCCESS。
 - COM10 串口已抓到 `遥控器连接成功，接收端提示音`。
+
+## 2026-06-08 ESP32-S3R8 屏幕/触摸最小探针
+
+### 目标
+
+把另一块 ESP32-S3R8 触摸屏开发板纳入当前项目，先用 Arduino + PlatformIO 最小化验证屏幕点亮和触摸读取，作为后续 LVGL 高级版遥控器的基础。
+
+### 已完成
+
+- 新增 PlatformIO 环境 `s3_lvgl_probe`。
+- 新增 `src/transmitter_s3_lvgl_probe/main.cpp`。
+- 选用 `LovyanGFX@1.2.21` 作为第一轮尝试库。
+- 按现有 ESP-IDF 工程引脚配置 GC9A01 240x240 8080 8bit LCD。
+- 按现有 ESP-IDF 工程引脚配置 CST816 I2C 触摸。
+- 探针界面绘制红/绿/蓝/白色块、圆形边框、中心十字和触摸坐标。
+- 触摸串口输出增加越界过滤，便于后续校准。
+- S3 探针串口使用普通 UART Serial，未启用 Arduino USB CDC。
+
+### 验证
+
+- `pio run -e s3_lvgl_probe`：SUCCESS。
+- `pio run -e s3_lvgl_probe -t upload --upload-port COM7`：SUCCESS。
+- `pio run -e transmitter -t upload --upload-port COM3`：SUCCESS。
+- `pio run -e receiver -t upload --upload-port COM10`：SUCCESS。
+- COM7 串口已抓到启动日志和有效触摸坐标，例如 `TOUCH x=1 y=169`、`TOUCH x=238 y=101`。
+
+### 待确认
+
+- 需要人工目视确认屏幕是否显示彩色测试图。
+- 触摸坐标可读取，但坐标方向和边缘映射仍需根据实际触摸位置校准。
+- 后续高级版遥控器需要重新规划实体摇杆、按钮、档位、CW2015 和蜂鸣器的 ESP32-S3 引脚。

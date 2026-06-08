@@ -26,6 +26,7 @@
 - 当前 PIO 项目保留发射端和接收端两个环境：
   - `transmitter`
   - `receiver`
+  - `s3_lvgl_probe`：ESP32-S3R8 触摸屏高级版遥控器的显示/触摸探针环境
 - 开发板：Espressif ESP32-C3-DevKitM-1
 - framework：Arduino
 - 通信：ESP-NOW 固定 MAC 配对。
