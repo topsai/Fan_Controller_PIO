@@ -75,7 +75,7 @@
 | `pio run -e s3_lvgl_probe` | SUCCESS |
 | `pio test -e native` | PASS，12/12 |
 | `pio device list` | COM1、COM7；无 COM3 / COM10 |
-| `pio run -e s3_transmitter -t upload --upload-port COM7` | FAILED，COM7 可见但被系统拒绝访问：`PermissionError(13, '拒绝访问。')` |
+| `pio run -e s3_transmitter -t upload --upload-port COM7` | 初次 FAILED，COM7 可见但被系统拒绝访问：`PermissionError(13, '拒绝访问。')` |
 
 ### 待硬件确认
 
@@ -83,3 +83,36 @@
 - 目视确认 LVGL 页面是否正常显示。
 - 触摸测试：确认 LVGL 坐标仍然左右/上下跟手。
 - 如颜色红蓝异常，再检查 `LV_COLOR_16_SWAP` 或 LovyanGFX 像素推送格式。
+
+## COM7 释放后上传复测
+
+### 执行结果
+
+| 项目 | 结果 |
+|---|---|
+| `pio device list` | COM1、COM7 |
+| `pio run -e s3_transmitter -t upload --upload-port COM7` | SUCCESS |
+| 上传识别芯片 | ESP32-S3 revision v0.2，8MB PSRAM |
+| 上传识别 MAC | `48:ca:43:9a:a9:b0` |
+| 固件大小 | RAM 40.3%，Flash 29.8% |
+| COM7 串口读取 | SUCCESS |
+
+### 串口关键信息
+
+```text
+ESP32-S3 formal transmitter
+S3 joystick center: 58
+S3 AUX I2C scan
+  found 0x0D
+  found 0x62
+  found 0x76
+S3 transmitter MAC: 48:CA:43:9A:A9:B0
+S3 THR:0 SPD:1 BTN:00 [LOST] BAT:OK
+```
+
+### 结论
+
+- 正式 `s3_transmitter` LVGL 固件已成功烧录到 S3。
+- 程序启动、摇杆中位校准、外设 I2C 扫描、CW2015 状态读取、串口状态输出均正常。
+- 当前 `[LOST]` 是因为 C3 接收端未接入，符合本轮硬件连接状态。
+- 仍需人工目视确认屏幕 LVGL 页面和触摸方向。

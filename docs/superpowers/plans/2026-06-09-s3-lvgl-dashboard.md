@@ -64,4 +64,4 @@ Document that the formal S3 transmitter now uses LVGL 8.3.11, while `s3_lvgl_pro
 
 Run builds/tests, try COM7 upload, then commit only the LVGL-related changes and push to GitHub.
 
-Status: builds and native tests passed. COM7 upload failed because Windows denied access to the port. LVGL changes were committed and pushed to GitHub.
+Status: builds and native tests passed. Initial COM7 upload failed because Windows denied access to the port. After the port was released, `s3_transmitter` uploaded successfully and startup logs were captured. LVGL changes were committed and pushed to GitHub.
