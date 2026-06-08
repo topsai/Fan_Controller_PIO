@@ -83,10 +83,21 @@
 | GPIO13 | `LCD_DC` | 输出 | LCD 命令/数据 |
 | GPIO8 | `LCD_RST` | 输入上拉 | 当前按原 ESP-IDF 工程处理，软件复位禁用 |
 | GPIO45 | `LCD_BL` | PWM 输出 | LCD 背光 |
-| GPIO41 | `LCD_POWER` | 输出 | LCD 电源使能 |
+| GPIO41 | `LCD_POWER` | 输出 | LCD 电源使能，当前按原 ESP-IDF 工程推断为低有效 |
 | GPIO47 | `LCD_TE` | 输入 | 当前探针未使用 |
 | GPIO15 | `TP_SDA` | I2C SDA | CST816 触摸 |
 | GPIO16 | `TP_SCL` | I2C SCL | CST816 触摸 |
 | GPIO17 | `TP_INT` | 输入 | CST816 触摸中断 |
 
 注意：这些屏幕引脚会占用原 C3 遥控器的多个 GPIO，因此高级版遥控器的摇杆、按钮、档位、CW2015 和蜂鸣器必须重新规划 S3 引脚。
+
+## 8. ESP32-S3R8 外设 I2C 总线
+
+用户补充确认：高级版遥控器开发板上另有一组外设 I2C 总线。
+
+| GPIO | 代码名称 | 方向 | 挂载芯片 |
+|---|---|---|---|
+| GPIO18 | `AUX_I2C_SDA` | I2C SDA | CW2015、BMP280、LSM6DSLTR、QMC5883L |
+| GPIO19 | `AUX_I2C_SCL` | I2C SCL | CW2015、BMP280、LSM6DSLTR、QMC5883L |
+
+注意：CST816 触摸使用 GPIO15/GPIO16，不与 GPIO18/GPIO19 这组外设 I2C 共用引脚。后续高级版遥控器需要在软件中明确分配 I2C 控制器，避免触摸和传感器初始化互相覆盖。

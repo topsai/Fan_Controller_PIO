@@ -4,6 +4,7 @@
 namespace {
 
 constexpr int LCD_POWER_PIN = 41;
+constexpr int LCD_POWER_ACTIVE_LEVEL = LOW;
 constexpr int LCD_TE_PIN = 47;
 constexpr int LCD_RST_PIN = 8;
 
@@ -143,7 +144,7 @@ void setup() {
   Serial.println("=================================");
 
   pinMode(LCD_POWER_PIN, OUTPUT);
-  digitalWrite(LCD_POWER_PIN, HIGH);
+  digitalWrite(LCD_POWER_PIN, LCD_POWER_ACTIVE_LEVEL);
   pinMode(LCD_RST_PIN, INPUT_PULLUP);
   pinMode(LCD_TE_PIN, INPUT);
 

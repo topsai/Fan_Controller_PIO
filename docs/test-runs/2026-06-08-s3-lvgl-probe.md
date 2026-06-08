@@ -84,3 +84,34 @@ TOUCH x=238 y=150
 2. 屏幕是否显示圆形边框、中心十字和 `S3 DISPLAY` / `TOUCH TEST` 文字。
 3. 触摸时屏幕上的紫色点是否跟随手指移动。
 4. 如果颜色反相、红蓝颠倒或画面旋转不对，需要调整 `invert`、`rgb_order` 或 `setRotation()`。
+
+## 黑屏排查更新
+
+用户反馈：上传后触摸串口输出存在，但屏幕为黑屏，没有任何显示。
+
+对比原 ESP-IDF 工程后发现：
+
+- 原工程中 GPIO41 `LCD_POWER` 只配置为输出，没有主动拉高。
+- 当前 Arduino 探针之前把 GPIO41 拉高。
+- 因此初步判断 GPIO41 的 LCD 电源使能为低有效。
+
+本次修改：
+
+- `LCD_POWER` 改为低有效输出。
+- 重新上传 `s3_lvgl_probe` 到 COM7。
+- COM7 应用启动日志正常。
+
+验证结果：
+
+| 项目 | 结果 |
+|---|---|
+| `pio run -e s3_lvgl_probe` | SUCCESS |
+| `pio run -e s3_lvgl_probe -t upload --upload-port COM7` | SUCCESS |
+| COM7 启动日志 | 正常 |
+| `pio test -e native` | PASS，12/12 |
+| `pio run -e transmitter` | SUCCESS |
+| `pio run -e receiver` | SUCCESS |
+| `pio run -e transmitter -t upload --upload-port COM3` | SUCCESS |
+| `pio run -e receiver -t upload --upload-port COM10` | SUCCESS |
+
+仍需人工目视确认：GPIO41 低有效修改后屏幕是否已经点亮。
