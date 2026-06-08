@@ -201,3 +201,46 @@ S3 THR:0 SPD:1 BTN:00 [LOST] BAT:OK
 
 - 目视确认文字红/青彩边是否消失。
 - 如果彩边变成颜色明显错误或依然存在，下一步改为在 flush 回调中手动转换 RGB565，再与 `LV_COLOR_16_SWAP` 做 A/B 对比。
+
+## LVGL UI 独立层和触摸显示复测
+
+### 本次变更
+
+- 新增 `src/transmitter_s3/ui/ui.h` 和 `src/transmitter_s3/ui/ui.cpp`。
+- `main.cpp` 不再持有 dashboard label/bar 对象。
+- `main.cpp` 通过 `S3UiState` 向 `ui_update()` 传递页面数据。
+- 触摸回调调用 `ui_set_touch()`：
+  - pressed：显示坐标和触摸点。
+  - released：显示 `TOUCH --` 并隐藏触摸点。
+
+### 验证结果
+
+| 项目 | 结果 |
+|---|---|
+| `pio run -e s3_transmitter` | SUCCESS，RAM 40.3%，Flash 29.8% |
+| `pio run -e s3_transmitter -t upload --upload-port COM7` | SUCCESS |
+| COM7 串口读取 | SUCCESS |
+| `pio run -e receiver` | SUCCESS |
+| `pio run -e transmitter` | SUCCESS |
+| `pio run -e s3_lvgl_probe` | SUCCESS |
+| `pio test -e native` | PASS，12/12 |
+
+### 串口关键信息
+
+```text
+ESP32-S3 formal transmitter
+S3 power profile: CPU 160MHz, LCD brightness 140, WiFi TX 8.5dBm
+S3 joystick center: 59
+S3 AUX I2C scan
+  found 0x0D
+  found 0x62
+  found 0x76
+S3 transmitter MAC: 48:CA:43:9A:A9:B0
+S3 THR:0 SPD:1 BTN:00 [LOST] BAT:OK
+```
+
+### 待人工确认
+
+- 触摸屏幕时，页面应显示 `TOUCH x,y`。
+- 洋红色触摸点应跟随手指移动。
+- 松手后触摸点应隐藏，文字回到 `TOUCH --`。

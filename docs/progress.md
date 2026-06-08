@@ -520,3 +520,37 @@
 - `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
 - COM7 串口启动正常。
 - 视觉效果仍需用户拍照或目视确认。
+
+## 2026-06-09 S3 LVGL UI 独立层和触摸显示
+
+### 目标
+
+将正式 S3 发射端的 LVGL 页面代码从 `main.cpp` 拆出，形成接近 SquareLine Studio 使用习惯的 `ui_init()` / `ui_update()` 边界，并加入基础触摸可视化。
+
+### 已完成
+
+- 新增 `src/transmitter_s3/ui/ui.h`。
+- 新增 `src/transmitter_s3/ui/ui.cpp`。
+- `main.cpp` 保留硬件、通信、传感器、输入、LVGL flush 和 touch driver 回调。
+- LVGL 页面对象、标签、油门条、颜色、布局和状态更新迁移到 `ui.cpp`。
+- 新增 `S3UiState`，由 `main.cpp` 汇总业务状态后传给 `ui_update()`。
+- 新增触摸点显示：
+  - 按下时显示洋红色小圆点。
+  - 按下时显示 `TOUCH x,y`。
+  - 松开时隐藏圆点并显示 `TOUCH --`。
+
+### 验证
+
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+- COM7 串口启动日志正常。
+- `pio run -e receiver`：SUCCESS。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e s3_lvgl_probe`：SUCCESS。
+- `pio test -e native`：PASS，12/12。
+
+### 待人工确认
+
+- 用手触摸屏幕，确认 `TOUCH x,y` 坐标变化。
+- 确认洋红色小圆点跟随手指移动。
+- 确认松手后圆点隐藏。
