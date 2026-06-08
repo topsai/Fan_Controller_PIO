@@ -1,5 +1,6 @@
 #include <unity.h>
 #include "control_logic.h"
+#include "beep_profiles.h"
 
 void setUp() {}
 void tearDown() {}
@@ -97,6 +98,20 @@ void test_remote_horn_resets_after_button_release() {
   TEST_ASSERT_EQUAL_UINT32(5000, hornStartMs);
 }
 
+void test_beep_profiles_use_distinct_frequencies() {
+  TEST_ASSERT_EQUAL_UINT16(1800, BEEP_FREQ_BUTTON);
+  TEST_ASSERT_EQUAL_UINT16(2200, BEEP_FREQ_STARTUP);
+  TEST_ASSERT_EQUAL_UINT16(1200, BEEP_FREQ_LINK_ALERT);
+  TEST_ASSERT_EQUAL_UINT16(900, BEEP_FREQ_FAILSAFE);
+  TEST_ASSERT_EQUAL_UINT16(2600, BEEP_FREQ_REMOTE_HORN);
+  TEST_ASSERT_EQUAL_UINT16(700, BEEP_FREQ_LOW_BATTERY);
+
+  TEST_ASSERT_NOT_EQUAL(BEEP_FREQ_BUTTON, BEEP_FREQ_STARTUP);
+  TEST_ASSERT_NOT_EQUAL(BEEP_FREQ_LINK_ALERT, BEEP_FREQ_FAILSAFE);
+  TEST_ASSERT_NOT_EQUAL(BEEP_FREQ_REMOTE_HORN, BEEP_FREQ_LINK_ALERT);
+  TEST_ASSERT_NOT_EQUAL(BEEP_FREQ_LOW_BATTERY, BEEP_FREQ_BUTTON);
+}
+
 void setup() {
   UNITY_BEGIN();
   RUN_TEST(test_pwm_mapping_uses_vesc_servo_range);
@@ -109,6 +124,7 @@ void setup() {
   RUN_TEST(test_receiver_link_alert_is_silent_when_connected_and_not_failsafe);
   RUN_TEST(test_remote_horn_has_maximum_continuous_duration);
   RUN_TEST(test_remote_horn_resets_after_button_release);
+  RUN_TEST(test_beep_profiles_use_distinct_frequencies);
   UNITY_END();
 }
 

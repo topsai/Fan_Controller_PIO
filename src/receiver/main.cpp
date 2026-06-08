@@ -12,6 +12,7 @@
 #include <esp_now.h>
 #include <WiFi.h>
 #include <esp_wifi.h>
+#include "beep_profiles.h"
 #include "control_logic.h"
 // ========== 引脚定义 ==========
 #define PWM_OUT_1 4  //SERVO
@@ -107,15 +108,15 @@ void IRAM_ATTR onTimer() {
   portEXIT_CRITICAL_ISR(&timerMux);
 }
 
-void beep(uint16_t duration_ms) {
-  tone(BUZZER_PIN, 2000, duration_ms);  // 2kHz，自动停止
+void beep(uint16_t frequency_hz, uint16_t duration_ms) {
+  tone(BUZZER_PIN, frequency_hz, duration_ms);  // 自动停止
 }
 
 void alarmBeep() {
   static uint32_t last = 0;
   if (millis() - last > 100) {
     last = millis();
-    tone(BUZZER_PIN, 2000, 100);  // 100ms鸣叫
+    tone(BUZZER_PIN, BEEP_FREQ_FAILSAFE, 100);  // 100ms鸣叫
   }
 }
 
@@ -280,7 +281,7 @@ void checkFailsafe() {
     failsafeActive = safeState.failsafeActive;
     failsafeBeepUntil = millis() + 1000;
     Serial.println("失控保护启动！");
-    beep(1000);
+    beep(BEEP_FREQ_FAILSAFE, 1000);
     // for (int i = 0; i < 5; i++) {
     //   beep(100);
     //   delay(100);
@@ -291,7 +292,7 @@ void checkFailsafe() {
 void updateLinkAlert() {
   if (shouldEmitReceiverLinkAlert(connected, failsafeActive, millis(), lastLinkAlertTime, linkAlertHasFired, LINK_ALERT_INTERVAL)) {
     Serial.println("遥控器未连接，接收端提示音");
-    beep(LINK_ALERT_BEEP_MS);
+    beep(BEEP_FREQ_LINK_ALERT, LINK_ALERT_BEEP_MS);
     failsafeBeepUntil = millis() + LINK_ALERT_BEEP_MS;
   }
 }
@@ -370,9 +371,9 @@ void setup() {
   setupESPNOW();
   setupTimer();
 
-  beep(100);
+  beep(BEEP_FREQ_STARTUP, 100);
   delay(200);
-  beep(100);
+  beep(BEEP_FREQ_STARTUP, 100);
 
   Serial.println("系统就绪");
   Serial.print("本机MAC: ");
@@ -395,7 +396,7 @@ void loop() {
 
   // 按钮2控制蜂鸣器（按下响，松开停）
   if (updateRemoteHorn()) {
-    tone(BUZZER_PIN, 2000);  // 持续响，不指定时长
+    tone(BUZZER_PIN, BEEP_FREQ_REMOTE_HORN);  // 持续响，由超时保护停止
   } else if (failsafeActive && millis() < failsafeBeepUntil) {
     // 失控提示音由 checkFailsafe() 启动，这里避免被按钮逻辑立即打断。
   } else {

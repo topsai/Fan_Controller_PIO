@@ -14,6 +14,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include "beep_profiles.h"
 #include "control_logic.h"
 
 // ========== 引脚定义 ==========
@@ -86,7 +87,7 @@ typedef struct {
 
 #pragma pack(pop)
 
-void beep(uint16_t duration_ms);
+void beep(uint16_t frequency_hz, uint16_t duration_ms);
 void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status);
 void onDataRecv(const uint8_t *mac, const uint8_t *data, int len);
 
@@ -275,7 +276,7 @@ void readButtons() {
     if (rawBtn1) {
       button1Pressed = true;
       buttonState |= 0x01;
-      beep(50);  // 按键音
+      beep(BEEP_FREQ_BUTTON, 50);  // 按键音
     } else {
       buttonState &= ~0x01;
     }
@@ -287,7 +288,7 @@ void readButtons() {
     if (rawBtn2) {
       button2Pressed = true;
       buttonState |= 0x02;
-      beep(50);  // 按键音
+      beep(BEEP_FREQ_BUTTON, 50);  // 按键音
     } else {
       buttonState &= ~0x02;
     }
@@ -295,11 +296,11 @@ void readButtons() {
 }
 
 // ========== 蜂鸣器控制 ==========
-void beep(uint16_t duration_ms) {
+void beep(uint16_t frequency_hz, uint16_t duration_ms) {
   // digitalWrite(BUZZER_PIN, HIGH);
   // delay(duration_ms);
   // digitalWrite(BUZZER_PIN, LOW);
-  tone(BUZZER_PIN, 2000, duration_ms);  // 2kHz，自动停止
+  tone(BUZZER_PIN, frequency_hz, duration_ms);  // 自动停止
 }
 
 void alarmBeep() {
@@ -307,7 +308,7 @@ void alarmBeep() {
   static uint32_t last = 0;
   if (millis() - last > 100) {
     last = millis();
-    tone(BUZZER_PIN, 2000, 100);  // 100ms鸣叫
+    tone(BUZZER_PIN, BEEP_FREQ_LINK_ALERT, 100);  // 100ms鸣叫
   }
 }
 
@@ -420,16 +421,16 @@ void checkBatteryAlert() {
   if (localBatteryPercent <= LOW_BATTERY_THRESHOLD && !lowBatteryWarned) {
     lowBatteryWarned = true;
     for (int i = 0; i < 3; i++) {
-      beep(50);
+      beep(BEEP_FREQ_LOW_BATTERY, 50);
       delay(50);
     }
-    beep(200);
+    beep(BEEP_FREQ_LOW_BATTERY, 200);
   }
   if (localBatteryPercent <= CRITICAL_BATTERY_THRESHOLD) {
     static uint32_t last = 0;
     if (millis() - last > 1000) {
       last = millis();
-      beep(500);
+      beep(BEEP_FREQ_LOW_BATTERY, 500);
     }
   }
   if (localBatteryPercent > LOW_BATTERY_THRESHOLD + 5) lowBatteryWarned = false;
@@ -506,9 +507,9 @@ void setup() {
   setupTimer();
 
   // 启动提示音
-  beep(100);
+  beep(BEEP_FREQ_STARTUP, 100);
   delay(100);
-  beep(100);
+  beep(BEEP_FREQ_STARTUP, 100);
 
   Serial.println("系统就绪！");
 }

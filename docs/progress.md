@@ -266,3 +266,33 @@
 ### 硬件复测状态
 
 新固件已上传到 COM3 和 COM10。接收端串口启动日志可见，并抓取到 `BTN:02` 后输出 `远程蜂鸣超时保护，已停止`，说明接收端已执行 3 秒远程蜂鸣超时保护。由于原始现象为约 1 小时左右偶发，仍建议后续长时间通电观察。
+
+## 2026-06-08 提示音频率区分
+
+### 目标
+
+不同提示音使用不同频率，避免所有场景都使用 2000Hz 导致听觉上难以区分。
+
+### 已完成
+
+- 新增 `include/beep_profiles.h`，集中定义提示音频率。
+- 发射端：
+  - 按键提示：1800Hz
+  - 开机提示：2200Hz
+  - 接收端断线报警：1200Hz
+  - 低电量报警：700Hz
+- 接收端：
+  - 开机提示：2200Hz
+  - 遥控器未连接/断电/失效提示：1200Hz
+  - 失控保护提示：900Hz
+  - 按钮 2 远程蜂鸣：2600Hz
+- 新增单元测试 `test_beep_profiles_use_distinct_frequencies`。
+- 更新 `docs/parameters.md` 和 `docs/user-guide.md`。
+
+### 验证
+
+- `pio test -e native`：11/11 PASS。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e receiver`：SUCCESS。
+- `pio run -e transmitter -t upload --upload-port COM3`：SUCCESS。
+- `pio run -e receiver -t upload --upload-port COM10`：SUCCESS。
