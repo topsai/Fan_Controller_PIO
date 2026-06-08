@@ -11,7 +11,7 @@ constexpr int LCD_TE_PIN = 47;
 constexpr int LCD_RST_PIN = 8;
 constexpr int AUX_I2C_SDA_PIN = 18;
 constexpr int AUX_I2C_SCL_PIN = 19;
-constexpr uint32_t AUX_I2C_FREQ_HZ = 100000;
+constexpr uint32_t AUX_I2C_FREQ_HZ = 300000;
 
 constexpr uint8_t CW2015_ADDR = 0x62;
 constexpr uint8_t BMP280_ADDR_0 = 0x76;
