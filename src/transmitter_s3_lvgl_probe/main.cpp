@@ -98,6 +98,10 @@ uint32_t invalidTouchCount = 0;
 int lastTouchX = -1;
 int lastTouchY = -1;
 
+uint16_t mapTouchX(uint16_t rawX) {
+  return 239 - rawX;
+}
+
 void drawStaticProbe() {
   display.fillScreen(TFT_BLACK);
   display.fillRect(0, 0, 240, 60, TFT_RED);
@@ -157,24 +161,25 @@ void setup() {
 }
 
 void loop() {
-  uint16_t x = 0;
+  uint16_t rawX = 0;
   uint16_t y = 0;
-  const bool touched = display.getTouch(&x, &y);
+  const bool touched = display.getTouch(&rawX, &y);
 
   if (touched) {
-    if (x >= 240 || y >= 240) {
+    if (rawX >= 240 || y >= 240) {
       invalidTouchCount++;
       if (millis() - lastTouchPrintMs > 250) {
         lastTouchPrintMs = millis();
-        Serial.printf("TOUCH invalid raw x=%u y=%u invalid_count=%lu\n", x, y, (unsigned long)invalidTouchCount);
+        Serial.printf("TOUCH invalid raw x=%u y=%u invalid_count=%lu\n", rawX, y, (unsigned long)invalidTouchCount);
       }
       delay(5);
       return;
     }
 
+    const uint16_t x = mapTouchX(rawX);
     if (millis() - lastTouchPrintMs > 80) {
       lastTouchPrintMs = millis();
-      Serial.printf("TOUCH x=%u y=%u\n", x, y);
+      Serial.printf("TOUCH raw_x=%u x=%u y=%u\n", rawX, x, y);
     }
     if ((int)x != lastTouchX || (int)y != lastTouchY) {
       updateTouchUi(x, y);

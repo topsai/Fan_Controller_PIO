@@ -115,3 +115,33 @@ TOUCH x=238 y=150
 | `pio run -e receiver -t upload --upload-port COM10` | SUCCESS |
 
 仍需人工目视确认：GPIO41 低有效修改后屏幕是否已经点亮。
+
+## 触摸 X 轴校准更新
+
+用户确认：
+
+- GPIO41 低有效后屏幕已经点亮。
+- 触摸点上下方向跟手。
+- 触摸点左右方向相反。
+
+本次修改：
+
+- 只对触摸 X 坐标做反转：`x = 239 - rawX`。
+- Y 坐标保持不变。
+- 串口输出格式改为同时显示原始 X 和校正 X：`TOUCH raw_x=... x=... y=...`。
+
+验证结果：
+
+| 项目 | 结果 |
+|---|---|
+| `pio run -e s3_lvgl_probe` | SUCCESS |
+| `pio run -e s3_lvgl_probe -t upload --upload-port COM7` | SUCCESS |
+| `pio test -e native` | PASS，12/12 |
+| `pio run -e transmitter` | SUCCESS |
+| `pio run -e receiver` | SUCCESS |
+| `pio run -e transmitter -t upload --upload-port COM3` | SUCCESS |
+| `pio run -e receiver -t upload --upload-port COM10` | SUCCESS |
+
+待人工确认：
+
+- 左右移动后屏幕触摸点是否已经跟手。
