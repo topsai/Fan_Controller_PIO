@@ -585,3 +585,32 @@
 - 本次串口日志中 CW2015 读取曾短暂出现 `requestFrom()` 错误，随后状态恢复为 `BAT:OK`；先作为观察项，不归入本次触摸优化问题。
 - 仍需人工触摸确认圆点延迟是否改善。
 - 仍需通电数分钟确认芯片温度是否保持可接受。
+
+## 2026-06-09 S3 LVGL 显示 DMA
+
+### 目标
+
+直接开启 S3 正式端 LVGL 屏幕刷新 DMA，减少 CPU 在 8-bit 并口屏像素推送上的搬运负担。
+
+### 已修改
+
+- `include/s3_runtime_config.h` 新增 `S3_LVGL_DISPLAY_USE_DMA=1`。
+- LVGL flush 从 `display.pushImage()` 改为 `display.pushImageDMA()`。
+- DMA 刷新后调用 `display.waitDMA()`，再执行 `lv_disp_flush_ready()`，避免 LVGL 绘图缓冲区被提前复用导致花屏。
+- 新增 native 单元测试确认 S3 LVGL 显示 DMA 配置为开启。
+
+### 验证
+
+- TDD 红灯：`pio test -e native` 因缺少 `S3_LVGL_DISPLAY_USE_DMA` 失败。
+- `pio test -e native`：PASS，14/14。
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+- COM7 启动日志确认正式 S3 程序启动，I2C 扫描到 `0x0D`、`0x62`、`0x76`。
+- `pio run -e receiver`：SUCCESS。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e s3_lvgl_probe`：SUCCESS。
+
+### 观察项
+
+- DMA 可能改善触摸响应和降低 CPU 搬运像素负担，但芯片温度仍需要实测确认。
+- 如果出现花屏、局部残影、重启或触摸变卡，需要优先检查 LVGL buffer 与 DMA 传输时序。

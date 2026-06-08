@@ -504,9 +504,12 @@ void setupDisplay() {
 void lvFlushCallback(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *colorP) {
   const int32_t width = area->x2 - area->x1 + 1;
   const int32_t height = area->y2 - area->y1 + 1;
-  display.startWrite();
+#if S3_LVGL_DISPLAY_USE_DMA
+  display.pushImageDMA(area->x1, area->y1, width, height, reinterpret_cast<const uint16_t *>(colorP));
+  display.waitDMA();
+#else
   display.pushImage(area->x1, area->y1, width, height, reinterpret_cast<const uint16_t *>(colorP));
-  display.endWrite();
+#endif
   lv_disp_flush_ready(disp);
 }
 

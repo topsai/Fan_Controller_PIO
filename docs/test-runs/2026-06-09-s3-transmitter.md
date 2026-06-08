@@ -290,3 +290,46 @@ S3 THR:0 SPD:1 BTN:00 [LOST] BAT:OK
 - 本次复测期间 CW2015 曾短暂读到 `BAT:N/A`，随后恢复 `BAT:OK`；暂记为 I2C/电量计读取稳定性观察项。
 - 仍需人工确认触摸圆点跟手延迟是否降低。
 - 仍需人工确认长时间运行温度是否可接受。
+
+## S3 LVGL 显示 DMA 复测
+
+### 本次变更
+
+| 项目 | 调整前 | 调整后 |
+|---|---|---|
+| LVGL flush 像素推送 | `display.pushImage()` | `display.pushImageDMA()` |
+| LVGL buffer 释放时机 | 同步推送后 ready | `display.waitDMA()` 后 ready |
+| DMA 配置 | 无显式开关 | `S3_LVGL_DISPLAY_USE_DMA=1` |
+
+### 验证结果
+
+| 项目 | 结果 |
+|---|---|
+| TDD 红灯 | `pio test -e native` 因缺少 `S3_LVGL_DISPLAY_USE_DMA` 失败 |
+| `pio test -e native` | PASS，14/14 |
+| `pio run -e s3_transmitter` | SUCCESS，RAM 40.3%，Flash 29.8% |
+| `pio run -e s3_transmitter -t upload --upload-port COM7` | SUCCESS |
+| COM7 串口读取 | SUCCESS |
+| `pio run -e receiver` | SUCCESS |
+| `pio run -e transmitter` | SUCCESS |
+| `pio run -e s3_lvgl_probe` | SUCCESS |
+
+### 串口关键日志
+
+```text
+ESP32-S3 formal transmitter
+S3 power profile: CPU 160MHz, LCD brightness 140, WiFi TX 8.5dBm
+S3 joystick center: 58
+S3 AUX I2C scan
+  found 0x0D
+  found 0x62
+  found 0x76
+S3 transmitter MAC: 48:CA:43:9A:A9:B0
+S3 THR:0 SPD:1 BTN:00 [LOST] BAT:OK
+```
+
+### 待人工确认
+
+- 目视确认 LVGL 页面是否仍然正常，无花屏、残影或闪烁。
+- 触摸圆点是否比一级优化后更顺滑。
+- 通电 3 到 5 分钟后确认芯片温度是否下降或保持可接受。

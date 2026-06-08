@@ -130,6 +130,10 @@ void test_s3_lvgl_timing_uses_low_latency_profile() {
   TEST_ASSERT_EQUAL_UINT8(2, S3_MAIN_LOOP_DELAY_MS);
 }
 
+void test_s3_lvgl_display_dma_is_enabled() {
+  TEST_ASSERT_TRUE(S3_LVGL_DISPLAY_USE_DMA);
+}
+
 void setup() {
   UNITY_BEGIN();
   RUN_TEST(test_pwm_mapping_uses_vesc_servo_range);
@@ -145,6 +149,7 @@ void setup() {
   RUN_TEST(test_beep_profiles_use_distinct_frequencies);
   RUN_TEST(test_receiver_connection_success_only_on_reconnect_edge);
   RUN_TEST(test_s3_lvgl_timing_uses_low_latency_profile);
+  RUN_TEST(test_s3_lvgl_display_dma_is_enabled);
   UNITY_END();
 }
 
