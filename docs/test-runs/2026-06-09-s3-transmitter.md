@@ -116,3 +116,56 @@ S3 THR:0 SPD:1 BTN:00 [LOST] BAT:OK
 - 程序启动、摇杆中位校准、外设 I2C 扫描、CW2015 状态读取、串口状态输出均正常。
 - 当前 `[LOST]` 是因为 C3 接收端未接入，符合本轮硬件连接状态。
 - 仍需人工目视确认屏幕 LVGL 页面和触摸方向。
+
+## S3 发热和 LVGL 显示撕裂复测
+
+### 用户反馈
+
+- 屏幕已点亮。
+- 屏幕文字有撕裂感，不太正常。
+- 芯片发热非常严重，特别烫。
+
+### 本次软件调整
+
+| 参数 | 调整前 | 调整后 |
+|---|---:|---:|
+| CPU 频率 | 默认 240MHz | 160MHz |
+| 屏幕背光 | 255/255 | 140/255 |
+| WiFi 发射功率 | 15dBm | 8.5dBm |
+| 已连接控制发送 | 100Hz | 100Hz |
+| 未连接搜索发送 | 100Hz | 20Hz |
+| LVGL handler 调度 | 主循环每圈 | 5ms |
+| 主循环 delay | 1ms | 5ms |
+| LVGL 页面数据更新 | 100ms | 200ms |
+
+### 验证结果
+
+| 项目 | 结果 |
+|---|---|
+| `pio run -e s3_transmitter` | SUCCESS |
+| `pio run -e s3_transmitter -t upload --upload-port COM7` | SUCCESS |
+| `pio run -e receiver` | SUCCESS |
+| `pio run -e transmitter` | SUCCESS |
+| `pio run -e s3_lvgl_probe` | SUCCESS |
+| `pio test -e native` | PASS，12/12 |
+| COM7 串口读取 | SUCCESS |
+
+### 串口关键信息
+
+```text
+ESP32-S3 formal transmitter
+S3 power profile: CPU 160MHz, LCD brightness 140, WiFi TX 8.5dBm
+S3 joystick center: 59
+S3 AUX I2C scan
+  found 0x0D
+  found 0x62
+  found 0x76
+S3 transmitter MAC: 48:CA:43:9A:A9:B0
+S3 THR:0 SPD:1 BTN:00 [LOST] BAT:OK
+```
+
+### 待人工确认
+
+- 通电 3 到 5 分钟后，确认芯片是否仍然烫手。
+- 目视确认 LVGL 文字撕裂是否改善。
+- 如果仍然严重发热，应立即断电，转入硬件供电/短路/背光电流排查。

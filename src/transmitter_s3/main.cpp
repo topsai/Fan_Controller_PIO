@@ -34,10 +34,14 @@ constexpr uint8_t BMP280_ADDR_0 = 0x76;
 constexpr uint8_t BMP280_ADDR_1 = 0x77;
 constexpr uint8_t QMC5883L_ADDR = 0x0D;
 
-constexpr uint16_t CONTROL_INTERVAL_MS = 10;
-constexpr uint16_t DISPLAY_INTERVAL_MS = 100;
+constexpr uint16_t CONTROL_CONNECTED_INTERVAL_MS = 10;
+constexpr uint16_t CONTROL_SEARCH_INTERVAL_MS = 50;
+constexpr uint16_t DISPLAY_INTERVAL_MS = 200;
 constexpr uint16_t LOCAL_SENSOR_INTERVAL_MS = 500;
 constexpr uint16_t CONNECTION_TIMEOUT_MS = 500;
+constexpr uint8_t LCD_BRIGHTNESS = 140;
+constexpr uint8_t MAIN_LOOP_DELAY_MS = 5;
+constexpr uint8_t LVGL_HANDLER_INTERVAL_MS = 5;
 constexpr int JOYSTICK_DEADZONE = 50;
 constexpr int ADC_CENTER = 2048;
 constexpr uint8_t LOW_BATTERY_THRESHOLD = 20;
@@ -232,6 +236,7 @@ uint32_t lastDisplayMs = 0;
 uint32_t lastLocalSensorMs = 0;
 uint32_t lastDebugMs = 0;
 uint32_t lastLinkAlertMs = 0;
+uint32_t lastLvglHandlerMs = 0;
 
 uint8_t calcChecksum(const uint8_t *data, uint8_t len) {
   uint8_t sum = 0;
@@ -505,7 +510,7 @@ void setupDisplay() {
   pinMode(LCD_TE_PIN, INPUT);
   display.init();
   display.setRotation(0);
-  display.setBrightness(255);
+  display.setBrightness(LCD_BRIGHTNESS);
 }
 
 void lvFlushCallback(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *colorP) {
@@ -591,12 +596,13 @@ void setupLvgl() {
 
   createLvglDashboard();
   lastLvTickMs = millis();
+  lastLvglHandlerMs = lastLvTickMs;
 }
 
 void setupEspNow() {
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
-  WiFi.setTxPower(WIFI_POWER_15dBm);
+  WiFi.setTxPower(WIFI_POWER_8_5dBm);
   WiFi.channel(1);
   if (esp_now_init() != ESP_OK) {
     Serial.println("ESP-NOW init failed");
@@ -728,9 +734,13 @@ void updateDashboard() {
 
 void setup() {
   Serial.begin(115200);
+  setCpuFrequencyMhz(160);
   delay(1000);
   Serial.println();
   Serial.println("ESP32-S3 formal transmitter");
+  Serial.printf("S3 power profile: CPU %uMHz, LCD brightness %u, WiFi TX 8.5dBm\n",
+                getCpuFrequencyMhz(),
+                LCD_BRIGHTNESS);
 
   setupPins();
   calibrateJoystickCenter();
@@ -756,7 +766,8 @@ void loop() {
     lastLvTickMs = now;
   }
 
-  if (now - lastControlMs >= CONTROL_INTERVAL_MS) {
+  const uint16_t controlIntervalMs = connected ? CONTROL_CONNECTED_INTERVAL_MS : CONTROL_SEARCH_INTERVAL_MS;
+  if (now - lastControlMs >= controlIntervalMs) {
     lastControlMs = now;
     sendControlPacket();
   }
@@ -774,7 +785,10 @@ void loop() {
     updateDashboard();
   }
 
-  lv_timer_handler();
+  if (now - lastLvglHandlerMs >= LVGL_HANDLER_INTERVAL_MS) {
+    lastLvglHandlerMs = now;
+    lv_timer_handler();
+  }
 
   if (now - lastDebugMs >= 1000) {
     lastDebugMs = now;
@@ -786,5 +800,5 @@ void loop() {
                   cw2015.valid ? "OK" : "N/A");
   }
 
-  delay(1);
+  delay(MAIN_LOOP_DELAY_MS);
 }

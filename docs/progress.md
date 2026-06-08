@@ -470,3 +470,42 @@
 
 - 目视确认 LVGL 页面是否正常显示。
 - 触摸测试：确认 LVGL 坐标左右/上下均跟手。
+
+## 2026-06-09 S3 发热和 LVGL 显示撕裂初步修复
+
+### 现象
+
+- 用户反馈：S3 屏幕已点亮，但文字有撕裂感，显示不太正常。
+- 用户反馈：芯片发热非常严重，特别烫。
+
+### 初步判断
+
+- 当前 S3 处于 `[LOST]`，即接收端未接入状态。
+- 正式端相比探针项目多了 ESP-NOW/WiFi，并且原配置在断联时仍 100Hz 发送控制包。
+- 原配置同时使用 WiFi 15dBm、背光 255/255、CPU 默认 240MHz、主循环 `delay(1)`，空载功耗偏高。
+- 显示撕裂可能与 LVGL 小区域刷新频率和主循环高占空比有关，仍需目视复测确认。
+
+### 已修改
+
+- S3 正式端 CPU 降为 160MHz。
+- 屏幕背光从 255/255 降为 140/255。
+- WiFi 发射功率从 15dBm 降为 8.5dBm。
+- 控制包发送改为：已连接 100Hz，未连接/搜索状态 20Hz。
+- LVGL handler 调度限制为 5ms 周期。
+- 主循环空闲延时从 1ms 增加到 5ms。
+
+### 验证
+
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+- COM7 串口启动日志确认：`S3 power profile: CPU 160MHz, LCD brightness 140, WiFi TX 8.5dBm`。
+- `pio run -e receiver`：SUCCESS。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e s3_lvgl_probe`：SUCCESS。
+- `pio test -e native`：PASS，12/12。
+
+### 仍需人工确认
+
+- 通电 3 到 5 分钟后，确认芯片温度是否从“烫手”降到可接受。
+- 目视确认文字撕裂是否改善。
+- 如果仍然明显发热，应断电并继续检查供电、电流、屏幕背光电路、S3 模组焊接和外设短路风险。
