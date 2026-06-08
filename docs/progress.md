@@ -554,3 +554,34 @@
 - 用手触摸屏幕，确认 `TOUCH x,y` 坐标变化。
 - 确认洋红色小圆点跟随手指移动。
 - 确认松手后圆点隐藏。
+
+## 2026-06-09 S3 触摸跟手一级优化
+
+### 目标
+
+在不引入双核 UI 任务、不大改架构的前提下，先降低 LVGL 触摸链路的等待时间，观察触摸点跟手和芯片温度变化。
+
+### 已修改
+
+- 新增 `include/s3_runtime_config.h`，集中记录 S3 正式端运行时节奏参数。
+- `LV_DISP_DEF_REFR_PERIOD` 设置为 16ms，约 60Hz 显示刷新。
+- `LV_INDEV_DEF_READ_PERIOD` 设置为 5ms，提高触摸读取频率。
+- `lv_timer_handler()` 调度周期从 5ms 改为 2ms。
+- 主循环空闲延时从 5ms 改为 2ms。
+- 页面业务数据更新仍保持 200ms，避免标签和状态文本无意义高频刷新。
+
+### 验证
+
+- `pio test -e native`：PASS，13/13。
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+- COM7 启动日志确认正式 S3 程序启动，I2C 扫描到 `0x0D`、`0x62`、`0x76`。
+- `pio run -e receiver`：SUCCESS。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e s3_lvgl_probe`：SUCCESS。
+
+### 观察项
+
+- 本次串口日志中 CW2015 读取曾短暂出现 `requestFrom()` 错误，随后状态恢复为 `BAT:OK`；先作为观察项，不归入本次触摸优化问题。
+- 仍需人工触摸确认圆点延迟是否改善。
+- 仍需通电数分钟确认芯片温度是否保持可接受。

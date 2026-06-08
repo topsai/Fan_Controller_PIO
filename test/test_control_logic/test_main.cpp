@@ -1,6 +1,7 @@
 #include <unity.h>
 #include "control_logic.h"
 #include "beep_profiles.h"
+#include "s3_runtime_config.h"
 
 void setUp() {}
 void tearDown() {}
@@ -122,6 +123,13 @@ void test_receiver_connection_success_only_on_reconnect_edge() {
   TEST_ASSERT_FALSE(shouldSignalReceiverConnectionSuccess(true, false));
 }
 
+void test_s3_lvgl_timing_uses_low_latency_profile() {
+  TEST_ASSERT_EQUAL_UINT16(16, S3_LVGL_DISPLAY_REFRESH_PERIOD_MS);
+  TEST_ASSERT_EQUAL_UINT16(5, S3_LVGL_INPUT_READ_PERIOD_MS);
+  TEST_ASSERT_EQUAL_UINT8(2, S3_LVGL_HANDLER_INTERVAL_MS);
+  TEST_ASSERT_EQUAL_UINT8(2, S3_MAIN_LOOP_DELAY_MS);
+}
+
 void setup() {
   UNITY_BEGIN();
   RUN_TEST(test_pwm_mapping_uses_vesc_servo_range);
@@ -136,6 +144,7 @@ void setup() {
   RUN_TEST(test_remote_horn_resets_after_button_release);
   RUN_TEST(test_beep_profiles_use_distinct_frequencies);
   RUN_TEST(test_receiver_connection_success_only_on_reconnect_edge);
+  RUN_TEST(test_s3_lvgl_timing_uses_low_latency_profile);
   UNITY_END();
 }
 

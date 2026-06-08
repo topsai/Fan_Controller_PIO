@@ -7,6 +7,7 @@
 #include <math.h>
 #include "beep_profiles.h"
 #include "control_logic.h"
+#include "s3_runtime_config.h"
 #include "ui/ui.h"
 
 namespace {
@@ -41,8 +42,6 @@ constexpr uint16_t DISPLAY_INTERVAL_MS = 200;
 constexpr uint16_t LOCAL_SENSOR_INTERVAL_MS = 500;
 constexpr uint16_t CONNECTION_TIMEOUT_MS = 500;
 constexpr uint8_t LCD_BRIGHTNESS = 140;
-constexpr uint8_t MAIN_LOOP_DELAY_MS = 5;
-constexpr uint8_t LVGL_HANDLER_INTERVAL_MS = 5;
 constexpr int JOYSTICK_DEADZONE = 50;
 constexpr int ADC_CENTER = 2048;
 constexpr uint8_t LOW_BATTERY_THRESHOLD = 20;
@@ -706,7 +705,7 @@ void loop() {
     updateDashboard();
   }
 
-  if (now - lastLvglHandlerMs >= LVGL_HANDLER_INTERVAL_MS) {
+  if (now - lastLvglHandlerMs >= S3_LVGL_HANDLER_INTERVAL_MS) {
     lastLvglHandlerMs = now;
     lv_timer_handler();
   }
@@ -721,5 +720,5 @@ void loop() {
                   cw2015.valid ? "OK" : "N/A");
   }
 
-  delay(MAIN_LOOP_DELAY_MS);
+  delay(S3_MAIN_LOOP_DELAY_MS);
 }

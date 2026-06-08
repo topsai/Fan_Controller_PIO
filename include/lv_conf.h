@@ -2,6 +2,7 @@
 #define LV_CONF_H
 
 #include <stdint.h>
+#include "s3_runtime_config.h"
 
 #define LV_COLOR_DEPTH 16
 #define LV_COLOR_16_SWAP 1
@@ -10,6 +11,8 @@
 #define LV_MEM_SIZE (64U * 1024U)
 
 #define LV_TICK_CUSTOM 0
+#define LV_DISP_DEF_REFR_PERIOD S3_LVGL_DISPLAY_REFRESH_PERIOD_MS
+#define LV_INDEV_DEF_READ_PERIOD S3_LVGL_INPUT_READ_PERIOD_MS
 #define LV_USE_LOG 0
 
 #define LV_USE_ASSERT_NULL 0

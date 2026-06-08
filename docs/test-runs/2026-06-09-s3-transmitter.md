@@ -244,3 +244,49 @@ S3 THR:0 SPD:1 BTN:00 [LOST] BAT:OK
 - 触摸屏幕时，页面应显示 `TOUCH x,y`。
 - 洋红色触摸点应跟随手指移动。
 - 松手后触摸点应隐藏，文字回到 `TOUCH --`。
+
+## S3 触摸跟手一级优化复测
+
+### 本次变更
+
+| 参数 | 调整前 | 调整后 |
+|---|---:|---:|
+| LVGL 显示刷新周期 | LVGL 默认 | 16ms |
+| LVGL 触摸读取周期 | LVGL 默认 | 5ms |
+| LVGL handler 调度 | 5ms | 2ms |
+| 主循环空闲延时 | 5ms | 2ms |
+| 页面业务数据更新 | 200ms | 200ms |
+
+### 验证结果
+
+| 项目 | 结果 |
+|---|---|
+| `pio test -e native` | PASS，13/13 |
+| `pio run -e s3_transmitter` | SUCCESS，RAM 40.3%，Flash 29.8% |
+| `pio run -e s3_transmitter -t upload --upload-port COM7` | SUCCESS |
+| COM7 串口读取 | SUCCESS |
+| `pio run -e receiver` | SUCCESS |
+| `pio run -e transmitter` | SUCCESS |
+| `pio run -e s3_lvgl_probe` | SUCCESS |
+
+### 串口关键日志
+
+```text
+ESP32-S3 formal transmitter
+S3 power profile: CPU 160MHz, LCD brightness 140, WiFi TX 8.5dBm
+S3 joystick center: 58
+S3 AUX I2C scan
+  found 0x0D
+  found 0x62
+  found 0x76
+S3 transmitter MAC: 48:CA:43:9A:A9:B0
+S3 THR:0 SPD:1 BTN:00 [LOST] BAT:OK
+S3 THR:0 SPD:1 BTN:00 [LOST] BAT:N/A
+S3 THR:0 SPD:1 BTN:00 [LOST] BAT:OK
+```
+
+### 观察项
+
+- 本次复测期间 CW2015 曾短暂读到 `BAT:N/A`，随后恢复 `BAT:OK`；暂记为 I2C/电量计读取稳定性观察项。
+- 仍需人工确认触摸圆点跟手延迟是否降低。
+- 仍需人工确认长时间运行温度是否可接受。
