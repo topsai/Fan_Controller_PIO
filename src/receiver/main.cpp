@@ -39,9 +39,11 @@
 
 VescUart VESC;
 
-// ========== 发射器MAC地址（必须修改为你的发射器MAC！）==========
-// 格式: {0xXX, 0xXX, 0xXX, 0xXX, 0xXX, 0xXX} ac:eb:e6:44:c5:90
+// ========== 发射器MAC地址 ==========
+// C3 基础版: AC:EB:E6:44:D5:54
+// S3 高级版: 48:CA:43:9A:A9:B0
 uint8_t transmitterMac[] = { 0xAC, 0xEB, 0xE6, 0x44, 0xD5, 0x54 };
+uint8_t s3TransmitterMac[] = { 0x48, 0xCA, 0x43, 0x9A, 0xA9, 0xB0 };
 
 // ========== 数据结构 ==========
 #pragma pack(push, 1)
@@ -101,6 +103,10 @@ volatile bool connectionBeepPending = false;
 uint32_t buzzerHoldUntil = 0;
 
 const int pwmChannels[] = { 0, 1, 2, 3 };
+
+bool isBoundTransmitter(const uint8_t *mac) {
+  return memcmp(mac, transmitterMac, 6) == 0 || memcmp(mac, s3TransmitterMac, 6) == 0;
+}
 
 // ========== 硬件定时器中断 ==========
 void IRAM_ATTR onTimer() {
@@ -170,6 +176,15 @@ void setupESPNOW() {
     Serial.println("添加发射器失败！");
     return;
   }
+
+  esp_now_peer_info_t s3Peer = {};
+  memcpy(s3Peer.peer_addr, s3TransmitterMac, 6);
+  s3Peer.channel = 0;
+  s3Peer.encrypt = false;
+  esp_now_del_peer(s3TransmitterMac);
+  if (esp_now_add_peer(&s3Peer) != ESP_OK) {
+    Serial.println("添加S3发射器失败！");
+  }
   Serial.println("发射器配对成功");
 
   // 接收回调
@@ -177,7 +192,7 @@ void setupESPNOW() {
     // Serial.printf("收到数据！len=%d, mac=%02X:%02X:%02X:%02X:%02X:%02X\n",
     //               len, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     // MAC过滤：只接受绑定的发射器
-    if (memcmp(mac, transmitterMac, 6) != 0) {
+    if (!isBoundTransmitter(mac)) {
       return;
     }
     // // 使用底层API获取RSSI
