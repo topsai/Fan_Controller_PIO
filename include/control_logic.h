@@ -124,3 +124,7 @@ inline bool shouldAllowRemoteHorn(
 
   return true;
 }
+
+inline bool shouldSignalReceiverConnectionSuccess(bool wasConnected, bool wasFailsafeActive) {
+  return !wasConnected || wasFailsafeActive;
+}

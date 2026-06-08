@@ -296,3 +296,27 @@
 - `pio run -e receiver`：SUCCESS。
 - `pio run -e transmitter -t upload --upload-port COM3`：SUCCESS。
 - `pio run -e receiver -t upload --upload-port COM10`：SUCCESS。
+
+## 2026-06-08 接收端连接成功提示音
+
+### 目标
+
+遥控器蜂鸣器暂未接线，因此连接成功提示音先放在接收端。
+
+### 已完成
+
+- 新增连接成功频率 `BEEP_FREQ_CONNECTED=2400Hz`。
+- 新增 `shouldSignalReceiverConnectionSuccess()`，只在接收端从未连接或 failsafe 状态恢复为连接时触发。
+- 接收端收到合法控制包后，如果是连接恢复边沿，主循环播放 2400Hz、160ms 短提示音。
+- 蜂鸣播放不在 ESP-NOW 回调内直接执行，只在回调内置 `connectionBeepPending` 标志。
+- 新增 `buzzerHoldUntil`，避免带时长提示音被主循环后续 `noTone()` 立即打断。
+- 新增单元测试 `test_receiver_connection_success_only_on_reconnect_edge`。
+
+### 验证
+
+- `pio test -e native`：12/12 PASS。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e receiver`：SUCCESS。
+- `pio run -e transmitter -t upload --upload-port COM3`：SUCCESS。
+- `pio run -e receiver -t upload --upload-port COM10`：SUCCESS。
+- COM10 串口已抓到 `遥控器连接成功，接收端提示音`。

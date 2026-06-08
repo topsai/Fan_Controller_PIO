@@ -35,6 +35,7 @@
 #define LINK_ALERT_INTERVAL 2000
 #define LINK_ALERT_BEEP_MS 200
 #define REMOTE_HORN_MAX_MS 3000
+#define CONNECTION_BEEP_MS 160
 
 VescUart VESC;
 
@@ -96,6 +97,8 @@ bool linkAlertHasFired = false;
 uint32_t remoteHornStartTime = 0;
 bool remoteHornActive = false;
 bool remoteHornTimeoutReported = false;
+volatile bool connectionBeepPending = false;
+uint32_t buzzerHoldUntil = 0;
 
 const int pwmChannels[] = { 0, 1, 2, 3 };
 
@@ -110,6 +113,7 @@ void IRAM_ATTR onTimer() {
 
 void beep(uint16_t frequency_hz, uint16_t duration_ms) {
   tone(BUZZER_PIN, frequency_hz, duration_ms);  // 自动停止
+  buzzerHoldUntil = millis() + duration_ms;
 }
 
 void alarmBeep() {
@@ -192,6 +196,8 @@ void setupESPNOW() {
     }
     if (sum != pkt->checksum) return;
 
+    const bool signalConnectionSuccess = shouldSignalReceiverConnectionSuccess(connected, failsafeActive);
+
     // 更新数据
     throttle = pkt->throttle;
     speedLevel = pkt->speedLevel;
@@ -200,6 +206,9 @@ void setupESPNOW() {
     lastRecvTime = millis();
     connected = true;
     failsafeActive = false;
+    if (signalConnectionSuccess) {
+      connectionBeepPending = true;
+    }
 
     digitalWrite(LED_STATUS, !digitalRead(LED_STATUS));
   });
@@ -314,6 +323,16 @@ bool updateRemoteHorn() {
   return allowed;
 }
 
+void updateConnectionBeep() {
+  if (!connectionBeepPending) {
+    return;
+  }
+
+  connectionBeepPending = false;
+  Serial.println("遥控器连接成功，接收端提示音");
+  beep(BEEP_FREQ_CONNECTED, CONNECTION_BEEP_MS);
+}
+
 // ========== 电池检测 ==========
 void readBattery() {
   // long sum = 0;
@@ -392,13 +411,14 @@ void loop() {
   static uint32_t lastVescRead = 0;
   checkFailsafe();
   updateLinkAlert();
+  updateConnectionBeep();
   updateMotors();
 
   // 按钮2控制蜂鸣器（按下响，松开停）
   if (updateRemoteHorn()) {
     tone(BUZZER_PIN, BEEP_FREQ_REMOTE_HORN);  // 持续响，由超时保护停止
-  } else if (failsafeActive && millis() < failsafeBeepUntil) {
-    // 失控提示音由 checkFailsafe() 启动，这里避免被按钮逻辑立即打断。
+  } else if (millis() < buzzerHoldUntil || (failsafeActive && millis() < failsafeBeepUntil)) {
+    // 定时提示音由 tone(..., duration) 自动停止，这里避免被按钮逻辑立即打断。
   } else {
     noTone(BUZZER_PIN);  // 停止
   }
