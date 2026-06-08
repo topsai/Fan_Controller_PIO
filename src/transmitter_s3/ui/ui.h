@@ -19,6 +19,7 @@ struct S3UiState {
   float bmp280PressureHpa = NAN;
   bool qmcValid = false;
   float qmcHeadingDeg = NAN;
+  uint16_t displayFps = 0;
 };
 
 void ui_init();

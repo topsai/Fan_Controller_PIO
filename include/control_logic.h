@@ -128,3 +128,10 @@ inline bool shouldAllowRemoteHorn(
 inline bool shouldSignalReceiverConnectionSuccess(bool wasConnected, bool wasFailsafeActive) {
   return !wasConnected || wasFailsafeActive;
 }
+
+inline uint16_t displayFpsForFrameCount(uint16_t frameCount, uint32_t elapsedMs) {
+  if (elapsedMs == 0) {
+    return 0;
+  }
+  return (uint16_t)(((uint32_t)frameCount * 1000U + elapsedMs / 2U) / elapsedMs);
+}

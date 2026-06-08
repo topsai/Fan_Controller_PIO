@@ -128,10 +128,17 @@ void test_s3_lvgl_timing_uses_low_latency_profile() {
   TEST_ASSERT_EQUAL_UINT16(5, S3_LVGL_INPUT_READ_PERIOD_MS);
   TEST_ASSERT_EQUAL_UINT8(2, S3_LVGL_HANDLER_INTERVAL_MS);
   TEST_ASSERT_EQUAL_UINT8(2, S3_MAIN_LOOP_DELAY_MS);
+  TEST_ASSERT_EQUAL_UINT16(1000, S3_DISPLAY_FPS_SAMPLE_INTERVAL_MS);
 }
 
 void test_s3_lvgl_display_dma_is_enabled() {
   TEST_ASSERT_TRUE(S3_LVGL_DISPLAY_USE_DMA);
+}
+
+void test_display_fps_rounds_from_frame_count_and_elapsed_time() {
+  TEST_ASSERT_EQUAL_UINT16(59, displayFpsForFrameCount(59, 1000));
+  TEST_ASSERT_EQUAL_UINT16(60, displayFpsForFrameCount(30, 500));
+  TEST_ASSERT_EQUAL_UINT16(0, displayFpsForFrameCount(10, 0));
 }
 
 void setup() {
@@ -150,6 +157,7 @@ void setup() {
   RUN_TEST(test_receiver_connection_success_only_on_reconnect_edge);
   RUN_TEST(test_s3_lvgl_timing_uses_low_latency_profile);
   RUN_TEST(test_s3_lvgl_display_dma_is_enabled);
+  RUN_TEST(test_display_fps_rounds_from_frame_count_and_elapsed_time);
   UNITY_END();
 }
 

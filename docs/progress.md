@@ -614,3 +614,33 @@
 
 - DMA 可能改善触摸响应和降低 CPU 搬运像素负担，但芯片温度仍需要实测确认。
 - 如果出现花屏、局部残影、重启或触摸变卡，需要优先检查 LVGL buffer 与 DMA 传输时序。
+
+## 2026-06-09 S3 页面增加 FPS 显示
+
+### 目标
+
+在 S3 正式端 LVGL 页面上显示屏幕刷新率/帧率参数，便于后续判断触摸延迟、DMA、刷新周期和页面复杂度之间的关系。
+
+### 已修改
+
+- 新增 `displayFpsForFrameCount()`，按指定时间窗口内完成的 LVGL flush 帧数折算 FPS。
+- `S3_DISPLAY_FPS_SAMPLE_INTERVAL_MS` 设置为 1000ms。
+- LVGL flush callback 每完成一次屏幕 flush 计数一次。
+- `updateDashboard()` 每秒更新一次 `displayFps`。
+- 页面底部触摸坐标右侧新增 `FPS n` 小字体显示。
+
+### 验证
+
+- TDD 红灯：`pio test -e native` 因缺少 `displayFpsForFrameCount()` 失败。
+- `pio test -e native`：PASS，15/15。
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+- COM7 启动日志确认正式 S3 程序启动，I2C 扫描到 `0x0D`、`0x62`、`0x76`。
+- `pio run -e receiver`：SUCCESS。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e s3_lvgl_probe`：SUCCESS。
+
+### 待人工确认
+
+- 目视确认底部右侧是否显示 `FPS n`。
+- 触摸屏幕时确认 `TOUCH x,y` 和 `FPS n` 不互相遮挡。

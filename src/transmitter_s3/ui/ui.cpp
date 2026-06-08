@@ -15,6 +15,7 @@ lv_obj_t *buttonLabel = nullptr;
 lv_obj_t *barLabel = nullptr;
 lv_obj_t *throttleBar = nullptr;
 lv_obj_t *touchLabel = nullptr;
+lv_obj_t *fpsLabel = nullptr;
 lv_obj_t *touchDot = nullptr;
 lv_obj_t *placeholderLabel = nullptr;
 
@@ -62,6 +63,12 @@ void ui_init() {
   lv_obj_set_style_text_color(touchLabel, lv_color_hex(0xC0C0C0), 0);
   lv_obj_set_style_text_font(touchLabel, &lv_font_montserrat_10, 0);
   lv_label_set_text(touchLabel, "TOUCH --");
+
+  fpsLabel = lv_label_create(screen);
+  lv_obj_set_pos(fpsLabel, 150, 198);
+  lv_obj_set_style_text_color(fpsLabel, lv_color_hex(0xC0C0C0), 0);
+  lv_obj_set_style_text_font(fpsLabel, &lv_font_montserrat_10, 0);
+  lv_label_set_text(fpsLabel, "FPS --");
 
   touchDot = lv_obj_create(screen);
   lv_obj_set_size(touchDot, 8, 8);
@@ -124,6 +131,9 @@ void ui_update(const S3UiState &state) {
                             state.joystickValue >= 0 ? lv_color_hex(0x00C853) : lv_color_hex(0xFF9800),
                             LV_PART_INDICATOR);
   lv_bar_set_value(throttleBar, state.joystickValue, LV_ANIM_OFF);
+
+  snprintf(buffer, sizeof(buffer), "FPS %u", state.displayFps);
+  lv_label_set_text(fpsLabel, buffer);
 }
 
 void ui_set_touch(bool pressed, int16_t x, int16_t y) {
