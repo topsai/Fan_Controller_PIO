@@ -400,3 +400,4 @@
 - CW2015、BMP280、QMC5883L 已有有效数据。
 - LSM6DSLTR 未在 `0x6A` / `0x6B` 响应；当前屏幕显示 `not found`，串口显示 `LSM:0`。
 - CW2015 电压换算已对齐原 C3 遥控器代码，不做 14bit 右移。
+- 用户补充确认 LSM6DSLTR 另有 GPIO20 `INT1_LSM` 和 GPIO21 `INT2_LSM` 两个中断脚；该信息不改变当前 I2C 扫描结论。

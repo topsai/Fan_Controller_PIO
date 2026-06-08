@@ -99,5 +99,7 @@
 |---|---|---|---|
 | GPIO18 | `AUX_I2C_SDA` | I2C SDA | CW2015、BMP280、LSM6DSLTR、QMC5883L |
 | GPIO19 | `AUX_I2C_SCL` | I2C SCL | CW2015、BMP280、LSM6DSLTR、QMC5883L |
+| GPIO20 | `INT1_LSM` | 输入 | LSM6DSLTR INT1 中断脚 |
+| GPIO21 | `INT2_LSM` | 输入 | LSM6DSLTR INT2 中断脚 |
 
 注意：CST816 触摸使用 GPIO15/GPIO16，不与 GPIO18/GPIO19 这组外设 I2C 共用引脚。后续高级版遥控器需要在软件中明确分配 I2C 控制器，避免触摸和传感器初始化互相覆盖。
