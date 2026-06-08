@@ -509,3 +509,14 @@
 - 通电 3 到 5 分钟后，确认芯片温度是否从“烫手”降到可接受。
 - 目视确认文字撕裂是否改善。
 - 如果仍然明显发热，应断电并继续检查供电、电流、屏幕背光电路、S3 模组焊接和外设短路风险。
+
+### 显示彩边复测补充
+
+- 根据用户照片，文字问题更像红/青彩边，不是整屏撕裂。
+- 已确认 LVGL 未启用 subpixel 字体，当前使用的 Montserrat 字体 `.subpx = LV_FONT_SUBPX_NONE`。
+- 初步判断为 8-bit 并口屏 RGB565 字节序与 LVGL 默认输出不匹配。
+- `include/lv_conf.h` 已将 `LV_COLOR_16_SWAP` 从 `0` 改为 `1`。
+- 已清理并重新编译 `s3_transmitter`，确保 LVGL 按新配置重建。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+- COM7 串口启动正常。
+- 视觉效果仍需用户拍照或目视确认。

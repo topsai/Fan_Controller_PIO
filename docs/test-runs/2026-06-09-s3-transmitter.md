@@ -169,3 +169,35 @@ S3 THR:0 SPD:1 BTN:00 [LOST] BAT:OK
 - 通电 3 到 5 分钟后，确认芯片是否仍然烫手。
 - 目视确认 LVGL 文字撕裂是否改善。
 - 如果仍然严重发热，应立即断电，转入硬件供电/短路/背光电流排查。
+
+## LVGL RGB565 字节序复测
+
+### 用户照片判断
+
+- 照片中白色和黄色文字边缘出现红/青彩边。
+- 现象不像整屏 tearing，更像 RGB565 字节序或颜色通道传输顺序不匹配。
+- 已检查 LVGL 字体：未启用 `LV_USE_FONT_SUBPX`，Montserrat 10/12/14 字体均为 `LV_FONT_SUBPX_NONE`。
+
+### 本次调整
+
+| 参数 | 调整前 | 调整后 |
+|---|---:|---:|
+| `LV_COLOR_16_SWAP` | 0 | 1 |
+
+### 验证结果
+
+| 项目 | 结果 |
+|---|---|
+| `pio run -e s3_transmitter -t clean` | SUCCESS |
+| `pio run -e s3_transmitter` | SUCCESS，RAM 40.3%，Flash 29.8% |
+| `pio run -e s3_transmitter -t upload --upload-port COM7` | SUCCESS |
+| COM7 串口读取 | SUCCESS |
+| `pio run -e receiver` | SUCCESS |
+| `pio run -e transmitter` | SUCCESS |
+| `pio run -e s3_lvgl_probe` | SUCCESS |
+| `pio test -e native` | PASS，12/12 |
+
+### 待人工确认
+
+- 目视确认文字红/青彩边是否消失。
+- 如果彩边变成颜色明显错误或依然存在，下一步改为在 flush 回调中手动转换 RGB565，再与 `LV_COLOR_16_SWAP` 做 A/B 对比。
