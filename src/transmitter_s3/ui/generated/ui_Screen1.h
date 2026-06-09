@@ -15,10 +15,11 @@ extern void ui_Screen1_screen_init(void);
 extern void ui_Screen1_screen_destroy(void);
 extern lv_obj_t * ui_Screen1;
 extern lv_obj_t * ui_bg_1;
-extern lv_obj_t * ui_uiArcBattery;
-extern lv_obj_t * ui_uiLabelBattery;
-extern lv_obj_t * ui_uiLabelSpeed;
+extern lv_obj_t * ui_ArcBattery;
+extern lv_obj_t * ui_LabelBattery;
+extern lv_obj_t * ui_LabelSpeed;
 extern lv_obj_t * ui_Label2;
+extern lv_obj_t * ui_LabelStatus;
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus

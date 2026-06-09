@@ -30,15 +30,19 @@ lv_obj_t *createDashboardLabel(int16_t x, int16_t y, lv_color_t color) {
 }
 
 lv_obj_t *batteryArc() {
-  return ui_uiArcBattery;
+  return ui_ArcBattery;
 }
 
 lv_obj_t *batteryValueLabel() {
-  return ui_uiLabelBattery;
+  return ui_LabelBattery;
 }
 
 lv_obj_t *speedValueLabel() {
-  return ui_uiLabelSpeed;
+  return ui_LabelSpeed;
+}
+
+lv_obj_t *statusValueLabel() {
+  return ui_LabelStatus;
 }
 
 }  // namespace
@@ -114,6 +118,11 @@ void s3_ui_init() {
     lv_label_set_text(speedValueLabel(), "0");
     lv_obj_set_style_text_color(speedValueLabel(), lv_color_hex(s3SpeedColorHex(0)), LV_PART_MAIN);
   }
+
+  if (statusValueLabel() != nullptr) {
+    lv_label_set_text(statusValueLabel(), "LOST");
+    lv_obj_set_style_text_color(statusValueLabel(), lv_color_hex(0xFF4040), LV_PART_MAIN);
+  }
 }
 
 void s3_ui_update(const S3UiState &state) {
@@ -127,6 +136,12 @@ void s3_ui_update(const S3UiState &state) {
     snprintf(buffer, sizeof(buffer), "LOST");
   }
   lv_label_set_text(statusLabel, buffer);
+  if (statusValueLabel() != nullptr) {
+    lv_label_set_text(statusValueLabel(), buffer);
+    lv_obj_set_style_text_color(statusValueLabel(),
+                                state.connected ? lv_color_hex(0x00D86A) : lv_color_hex(0xFF4040),
+                                LV_PART_MAIN);
+  }
 
   snprintf(buffer, sizeof(buffer), "SPD %u  THR %d", state.speedLevel, state.joystickValue);
   lv_label_set_text(controlLabel, buffer);

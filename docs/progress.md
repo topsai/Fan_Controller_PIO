@@ -816,3 +816,26 @@ SquareLine 重新导出后，电池 Arc 的实际实例名是 `ui_uiArcBattery`�
 - 新增 native 单测 `test_s3_speed_label_color_uses_speed_bands`。
 - `pio test -e native`：PASS，18/18。
 - `pio run -e s3_transmitter`：SUCCESS。
+
+## 2026-06-09 S3 状态 Label 数据绑定
+
+### 目标
+
+接入 SquareLine 中新增的 `ui_LabelStatus`，显示接收器连接状态和 VESC 回传电压。
+
+### 已修改
+
+- SquareLine 生成控件命名已修正为 `ui_ArcBattery`、`ui_LabelBattery`、`ui_LabelSpeed`、`ui_LabelStatus`。
+- `src/transmitter_s3/ui/ui.cpp` 同步绑定新的正式控件名。
+- `ui_LabelStatus` 在连接时显示 `OK xx.xxV`，断联时显示 `LOST`。
+- `ui_LabelStatus` 在连接时显示绿色，断联时显示红色。
+- 更新 `docs/squareline-data-binding.md` 中的实际控件名和状态 Label 说明。
+
+### 验证
+
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio test -e native`：PASS，18/18。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e receiver`：SUCCESS。
+- `git diff --check`：PASS，仅有 CRLF 换行提示。
