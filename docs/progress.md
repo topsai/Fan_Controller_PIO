@@ -727,3 +727,27 @@
 - `pio run -e s3_transmitter`：SUCCESS。
 - `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
 - COM7 短时监听未捕获到启动日志；屏幕视觉效果需以实物观察为准。
+
+## 2026-06-09 S3 SquareLine 图片颜色异常修复
+
+### 现象
+
+SquareLine Studio 预览中背景图为深色，但实机显示为粉色/绿色偏色；同屏文字颜色基本正常。
+
+### 判断
+
+问题集中在 SquareLine 导出的 `LV_IMG_CF_TRUE_COLOR` 图片资源。项目使用 `LV_COLOR_DEPTH=16` 和 `LV_COLOR_16_SWAP=1`，而 SquareLine 导出的 true color 图片数据未按当前字节序转换，导致图片颜色异常。
+
+### 已修改
+
+- 增强 `tools/platformio/patch_squareline_export.py`。
+- 构建前自动处理 `src/transmitter_s3/ui/generated/ui_img_*.c` 中的 `LV_IMG_CF_TRUE_COLOR` 图片资源。
+- 对 16-bit 图片数据执行字节对调，并写入 marker，避免重复转换。
+
+### 验证
+
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio test -e native`：PASS，16/16。
+- 初次上传失败原因是残留 `pio device monitor -p COM7 -b 115200` 占用串口。
+- 结束残留 monitor 后，`pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+- 实机颜色效果仍需目视确认。
