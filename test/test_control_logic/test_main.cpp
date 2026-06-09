@@ -207,6 +207,19 @@ void test_s3_speed_label_color_uses_speed_bands() {
   TEST_ASSERT_EQUAL_UINT32(0xFF4040, s3SpeedColorHex(30));
 }
 
+void test_s3_status_text_appends_lock_without_hiding_link_status() {
+  char buffer[16] = {};
+
+  s3FormatStatusText(buffer, sizeof(buffer), true, false);
+  TEST_ASSERT_EQUAL_STRING("OK LOCK", buffer);
+
+  s3FormatStatusText(buffer, sizeof(buffer), false, false);
+  TEST_ASSERT_EQUAL_STRING("LOST LOCK", buffer);
+
+  s3FormatStatusText(buffer, sizeof(buffer), true, true);
+  TEST_ASSERT_EQUAL_STRING("OK", buffer);
+}
+
 void test_s3_voltage_arc_value_clamps_to_vesc_display_range() {
   TEST_ASSERT_EQUAL_INT16(6, s3StatusVoltageForArc(false, 4800));
   TEST_ASSERT_EQUAL_INT16(6, s3StatusVoltageForArc(true, 0));
@@ -254,6 +267,7 @@ void setup() {
   RUN_TEST(test_receiver_status_target_tracks_last_valid_transmitter);
   RUN_TEST(test_s3_battery_arc_value_clamps_and_rounds_soc);
   RUN_TEST(test_s3_speed_label_color_uses_speed_bands);
+  RUN_TEST(test_s3_status_text_appends_lock_without_hiding_link_status);
   RUN_TEST(test_s3_voltage_arc_value_clamps_to_vesc_display_range);
   RUN_TEST(test_s3_throttle_bar_keeps_center_and_uses_direction_colors);
   RUN_TEST(test_s3_bmp280_altitude_uses_standard_sea_level_pressure);

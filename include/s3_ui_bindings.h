@@ -2,6 +2,8 @@
 
 #include <math.h>
 #include <stdint.h>
+#include <stddef.h>
+#include <stdio.h>
 
 #include "control_logic.h"
 
@@ -20,6 +22,13 @@ inline uint32_t s3SpeedColorHex(uint16_t speedKmh) {
     return 0xFFD23F;
   }
   return 0x00D86A;
+}
+
+inline void s3FormatStatusText(char *buffer, size_t bufferSize, bool connected, bool armed) {
+  if (bufferSize == 0) {
+    return;
+  }
+  snprintf(buffer, bufferSize, "%s%s", connected ? "OK" : "LOST", armed ? "" : " LOCK");
 }
 
 inline int16_t s3StatusVoltageForArc(bool connected, uint16_t voltageX100) {

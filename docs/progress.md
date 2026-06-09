@@ -965,3 +965,26 @@ SquareLine 页面已经承接主要参数显示后，删除 `src/transmitter_s3/
 - `pio run -e transmitter -t upload --upload-port COM3`：SUCCESS。
 - `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
 - S3 BMP 参数的实物显示仍需上电后人工确认。
+
+## 2026-06-09 S3 状态 Label 解锁标记显示调整
+
+### 现象
+
+S3 未解锁时 `ui_LabelStatus` 被直接写成 `LOCK`，导致原本的连接状态 `OK` / `LOST` 被覆盖。
+
+### 已修改
+
+- `include/s3_ui_bindings.h` 新增 `s3FormatStatusText()`。
+- `src/transmitter_s3/ui/ui.cpp` 改为先保留连接状态，再在未解锁时追加 `LOCK`。
+- 显示格式改为：`OK`、`LOST`、`OK LOCK`、`LOST LOCK`。
+- 更新 `docs/squareline-data-binding.md`。
+
+### 验证
+
+- 新增 native 单测 `test_s3_status_text_appends_lock_without_hiding_link_status`。
+- `pio test -e native`：PASS，26/26。
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e receiver`：SUCCESS。
+- `git diff --check`：PASS，仅有 CRLF 换行提示。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。

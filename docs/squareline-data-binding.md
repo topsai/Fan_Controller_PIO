@@ -40,7 +40,7 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 
 当前 SquareLine 导出的速度 Label 实例名是 `ui_LabelSpeed`。速度颜色规则在 `include/s3_ui_bindings.h` 的 `s3SpeedColorHex()` 中维护：低于 15 km/h 为绿色，15-29 km/h 为黄色，30 km/h 及以上为红色。
 
-当前 SquareLine 导出的状态 Label 实例名是 `ui_LabelStatus`。连接时显示 `OK` 并使用绿色；断联时显示 `LOST` 并使用红色。VESC 电压由独立的 `ui_LabelStatusVoltage` 显示。
+当前 SquareLine 导出的状态 Label 实例名是 `ui_LabelStatus`。连接时显示 `OK` 并使用绿色；断联时显示 `LOST` 并使用红色。发射端未解锁时不会覆盖连接状态，而是在状态后追加 `LOCK`，例如 `OK LOCK` 或 `LOST LOCK`。VESC 电压由独立的 `ui_LabelStatusVoltage` 显示。
 
 当前 SquareLine 导出的档位 Label 实例名是 `ui_LabelControl`，显示格式为单独档位数字，例如 `1`、`2`、`3`。
 

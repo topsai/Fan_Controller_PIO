@@ -181,13 +181,7 @@ void s3_ui_update(const S3UiState &state) {
   const int16_t throttleBarValue = s3ThrottleBarValue(state.joystickValue);
   const int16_t statusVoltageValue = s3StatusVoltageForArc(state.connected, state.receiverVoltageX100);
 
-  if (!state.armed) {
-    snprintf(buffer, sizeof(buffer), "LOCK");
-  } else if (state.connected) {
-    snprintf(buffer, sizeof(buffer), "OK");
-  } else {
-    snprintf(buffer, sizeof(buffer), "LOST");
-  }
+  s3FormatStatusText(buffer, sizeof(buffer), state.connected, state.armed);
   if (statusValueLabel() != nullptr) {
     lv_label_set_text(statusValueLabel(), buffer);
     const uint32_t color = !state.armed ? 0xFFD23F : (state.connected ? 0x00D86A : 0xFF4040);
