@@ -3,24 +3,22 @@
 // LVGL version: 8.3.11
 // Project name: s3_transmitter_squareline
 
-#ifndef UI_SCREEN1_H
-#define UI_SCREEN1_H
+#ifndef _UI_COMP_UIARCBATTERY_H
+#define _UI_COMP_UIARCBATTERY_H
+
+#include "ui.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// SCREEN: ui_Screen1
-extern void ui_Screen1_screen_init(void);
-extern void ui_Screen1_screen_destroy(void);
-extern lv_obj_t * ui_Screen1;
-extern lv_obj_t * ui_bg_1;
-extern lv_obj_t * ui_BAT;
-// CUSTOM VARIABLES
+// COMPONENT uiArcBattery
+#define UI_COMP_UIARCBATTERY_UIARCBATTERY 0
+#define _UI_COMP_UIARCBATTERY_NUM 1
+lv_obj_t * ui_uiArcBattery_create(lv_obj_t * comp_parent);
 
 #ifdef __cplusplus
 } /*extern "C"*/
 #endif
 
 #endif
-

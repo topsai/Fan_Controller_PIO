@@ -1,3 +1,5 @@
+ui_comp_uiarcbattery.c
+ui_comp.c
 ui_Screen1.c
 ui.c
 ui_comp_hook.c

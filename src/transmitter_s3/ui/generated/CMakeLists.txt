@@ -1,4 +1,6 @@
-SET(SOURCES ui_Screen1.c
+SET(SOURCES ui_comp_uiarcbattery.c
+    ui_comp.c
+    ui_Screen1.c
     ui.c
     ui_comp_hook.c
     ui_helpers.c

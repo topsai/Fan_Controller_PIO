@@ -2,6 +2,7 @@
 #include "control_logic.h"
 #include "beep_profiles.h"
 #include "s3_runtime_config.h"
+#include "s3_ui_bindings.h"
 
 void setUp() {}
 void tearDown() {}
@@ -152,6 +153,14 @@ void test_receiver_status_target_tracks_last_valid_transmitter() {
   TEST_ASSERT_EQUAL_UINT8_ARRAY(s3Mac, statusTarget, 6);
 }
 
+void test_s3_battery_arc_value_clamps_and_rounds_soc() {
+  TEST_ASSERT_EQUAL_INT16(0, s3BatteryPercentForArc(false, 80.0f));
+  TEST_ASSERT_EQUAL_INT16(0, s3BatteryPercentForArc(true, -4.0f));
+  TEST_ASSERT_EQUAL_INT16(0, s3BatteryPercentForArc(true, NAN));
+  TEST_ASSERT_EQUAL_INT16(81, s3BatteryPercentForArc(true, 80.6f));
+  TEST_ASSERT_EQUAL_INT16(100, s3BatteryPercentForArc(true, 120.0f));
+}
+
 void setup() {
   UNITY_BEGIN();
   RUN_TEST(test_pwm_mapping_uses_vesc_servo_range);
@@ -170,6 +179,7 @@ void setup() {
   RUN_TEST(test_s3_lvgl_display_dma_is_enabled);
   RUN_TEST(test_display_fps_rounds_from_frame_count_and_elapsed_time);
   RUN_TEST(test_receiver_status_target_tracks_last_valid_transmitter);
+  RUN_TEST(test_s3_battery_arc_value_clamps_and_rounds_soc);
   UNITY_END();
 }
 

@@ -751,3 +751,26 @@ SquareLine Studio 预览中背景图为深色，但实机显示为粉色/绿色�
 - 初次上传失败原因是残留 `pio device monitor -p COM7 -b 115200` 占用串口。
 - 结束残留 monitor 后，`pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
 - 实机颜色效果仍需目视确认。
+
+## 2026-06-09 S3 SquareLine 正规数据绑定
+
+### 目标
+
+把 S3 页面改为常规 SquareLine 集成方式：SquareLine 负责控件和静态样式，固件代码负责数据绑定。
+
+### 已修改
+
+- 新增 `include/s3_ui_bindings.h`，集中处理 UI 数值转换。
+- 新增 `s3BatteryPercentForArc()`，将 CW2015 SOC 转换为 Arc 所需的 `0-100` 整数值。
+- `s3_ui_update()` 已把当前 SquareLine 导出的 `ui_BAT` 绑定到 `S3UiState::cw2015Soc`。
+- 电池 Arc 在无效电量时显示 `0`，低于等于 20% 时指示色变红。
+- 新增 `docs/squareline-data-binding.md`，记录 SquareLine 控件命名、数据来源和绑定方式。
+
+### 验证
+
+- 新增 native 单测 `test_s3_battery_arc_value_clamps_and_rounds_soc`。
+- `pio test -e native`：PASS，17/17。
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e receiver`：SUCCESS。

@@ -1,6 +1,7 @@
 #include "ui.h"
 
 #include "generated/ui.h"
+#include "s3_ui_bindings.h"
 #include <lvgl.h>
 
 namespace {
@@ -86,10 +87,17 @@ void s3_ui_init() {
   lv_obj_set_style_text_font(placeholderLabel, &lv_font_montserrat_10, 0);
   lv_label_set_text(placeholderLabel, "pins are placeholders");
   lv_obj_align(placeholderLabel, LV_ALIGN_BOTTOM_MID, 0, -12);
+
+  if (ui_BAT != nullptr) {
+    lv_arc_set_range(ui_BAT, 0, 100);
+    lv_arc_set_value(ui_BAT, 0);
+    lv_obj_clear_flag(ui_BAT, LV_OBJ_FLAG_CLICKABLE);
+  }
 }
 
 void s3_ui_update(const S3UiState &state) {
   char buffer[48] = {};
+  const int16_t batteryPercent = s3BatteryPercentForArc(state.cw2015Valid, state.cw2015Soc);
 
   lv_obj_set_style_text_color(statusLabel, state.connected ? lv_color_hex(0x00FF66) : lv_color_hex(0xFF4040), 0);
   if (state.connected) {
@@ -111,6 +119,13 @@ void s3_ui_update(const S3UiState &state) {
     snprintf(buffer, sizeof(buffer), "BAT N/A");
   }
   lv_label_set_text(batteryLabel, buffer);
+
+  if (ui_BAT != nullptr) {
+    lv_arc_set_value(ui_BAT, batteryPercent);
+    lv_obj_set_style_arc_color(ui_BAT,
+                               batteryPercent <= 20 ? lv_color_hex(0xFF4040) : lv_color_hex(0x00D86A),
+                               LV_PART_INDICATOR);
+  }
 
   if (state.bmp280Valid) {
     snprintf(buffer, sizeof(buffer), "BMP %.1fC %.0fhPa", state.bmp280TemperatureC, state.bmp280PressureHpa);
