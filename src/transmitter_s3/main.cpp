@@ -43,7 +43,7 @@ constexpr uint16_t CONTROL_SEARCH_INTERVAL_MS = 50;
 constexpr uint16_t DISPLAY_INTERVAL_MS = 200;
 constexpr uint16_t LOCAL_SENSOR_INTERVAL_MS = 500;
 constexpr uint8_t LOCAL_SENSOR_INVALIDATE_AFTER_FAILURES = 6;
-constexpr uint16_t CONNECTION_TIMEOUT_MS = 500;
+constexpr uint16_t CONNECTION_TIMEOUT_MS = S3_ESPNOW_STATUS_TIMEOUT_MS;
 constexpr uint8_t ESPNOW_CHANNEL = 1;
 constexpr uint8_t LCD_BRIGHTNESS = 140;
 constexpr int JOYSTICK_DEADZONE = 50;
@@ -54,6 +54,16 @@ constexpr int THROTTLE_SLEW_STEP = 40;
 constexpr int JOYSTICK_CENTER_ADJUST_STEP = 10;
 constexpr uint8_t LOW_BATTERY_THRESHOLD = 20;
 constexpr uint8_t CRITICAL_BATTERY_THRESHOLD = 10;
+
+#if S3_ESPNOW_TX_POWER_DBM_X4 >= 78
+constexpr wifi_power_t S3_ESPNOW_TX_POWER = WIFI_POWER_19_5dBm;
+#elif S3_ESPNOW_TX_POWER_DBM_X4 >= 60
+constexpr wifi_power_t S3_ESPNOW_TX_POWER = WIFI_POWER_15dBm;
+#elif S3_ESPNOW_TX_POWER_DBM_X4 >= 34
+constexpr wifi_power_t S3_ESPNOW_TX_POWER = WIFI_POWER_8_5dBm;
+#else
+constexpr wifi_power_t S3_ESPNOW_TX_POWER = WIFI_POWER_2dBm;
+#endif
 
 #pragma pack(push, 1)
 struct ControlPacket {
@@ -646,7 +656,7 @@ void setupLvgl() {
 void setupEspNow() {
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
-  WiFi.setTxPower(WIFI_POWER_8_5dBm);
+  WiFi.setTxPower(S3_ESPNOW_TX_POWER);
   WiFi.channel(ESPNOW_CHANNEL);
   esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
   if (esp_now_init() != ESP_OK) {
@@ -768,9 +778,10 @@ void setup() {
   delay(1000);
   Serial.println();
   Serial.println("ESP32-S3 formal transmitter");
-  Serial.printf("S3 power profile: CPU %uMHz, LCD brightness %u, WiFi TX 8.5dBm\n",
+  Serial.printf("S3 power profile: CPU %uMHz, LCD brightness %u, WiFi TX %.1fdBm\n",
                 getCpuFrequencyMhz(),
-                LCD_BRIGHTNESS);
+                LCD_BRIGHTNESS,
+                S3_ESPNOW_TX_POWER_DBM_X4 / 4.0f);
 
   setupPins();
   calibrateJoystickCenter();

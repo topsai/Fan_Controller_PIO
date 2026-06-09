@@ -989,6 +989,38 @@ S3 未解锁时 `ui_LabelStatus` 被直接写成 `LOCK`，导致原本的连接�
 - `git diff --check`：PASS，仅有 CRLF 换行提示。
 - `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
 
+## 2026-06-09 S3 间歇性断联稳定性调整
+
+### 现象
+
+S3 高级发射端使用过程中会间歇性显示或表现为断联。
+
+### 分析
+
+- S3 原 ESP-NOW 发射功率设置为 `8.5dBm`，对实际遥控链路偏保守，边缘信号下更容易丢包。
+- S3 页面状态包超时原为 `500ms`；接收端遥测理论为 `20Hz`，但 LCD 刷新、I2C 读取、串口输出或无线重传造成短暂抖动时，UI 容易提前显示 `LOST`。
+- 接收端 failsafe 超时仍为 `2000ms`，本次没有放宽接收端安全保护。
+
+### 已修改
+
+- `include/s3_runtime_config.h` 新增：
+  - `S3_ESPNOW_STATUS_TIMEOUT_MS = 1000`
+  - `S3_ESPNOW_TX_POWER_DBM_X4 = 78`
+- S3 状态回包超时从 `500ms` 调整到 `1000ms`。
+- S3 WiFi/ESP-NOW 发射功率从 `8.5dBm` 调整到 `19.5dBm`。
+- S3 启动日志同步显示当前 WiFi TX dBm。
+
+### 验证
+
+- 新增 native 单测 `test_s3_espnow_link_uses_stable_radio_profile`。
+- 初次运行 `pio test -e native` 因新配置未实现失败，随后实现后通过。
+- `pio test -e native`：PASS，29/29。
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e receiver`：SUCCESS。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+- 串口抓取尝试：COM7/COM10 均被占用，未能完成 15 秒在线日志确认。
+
 ## 2026-06-09 S3 电量/BMP280 瞬时归零修复
 
 ### 现象
