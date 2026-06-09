@@ -10,6 +10,7 @@
 
 #include <Arduino.h>
 #include <esp_now.h>
+#include <esp_wifi.h>
 #include <WiFi.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -40,6 +41,7 @@
 #define OLED_WIDTH 128
 #define OLED_HEIGHT 64
 #define OLED_ADDR 0x3C
+#define ESPNOW_CHANNEL 1
 
 // ========== CW2015寄存器 ==========
 #define CW2015_ADDR 0x62         // CW2015 I2C地址 [^43^]
@@ -194,8 +196,9 @@ void setupESPNOW() {
   WiFi.setSleep(false);  
   // WiFi.setTxPower(WIFI_POWER_19_5dBm);  // 最大发射功率
   WiFi.setTxPower(WIFI_POWER_15dBm);
-  // 添加这行：固定信道
-  WiFi.channel(1);
+  // 固定信道，必须与接收端一致。
+  WiFi.channel(ESPNOW_CHANNEL);
+  esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
   if (esp_now_init() != ESP_OK) {
     Serial.println("ESP-NOW初始化失败！");
     return;
@@ -207,7 +210,7 @@ void setupESPNOW() {
   // 添加配对
   esp_now_peer_info_t peerInfo = {};
   memcpy(peerInfo.peer_addr, receiverMac, 6);
-  peerInfo.channel = 0;  // 当前信道
+  peerInfo.channel = ESPNOW_CHANNEL;
   peerInfo.encrypt = false;
 
   // 先删除可能存在的旧配对

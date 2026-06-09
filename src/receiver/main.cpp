@@ -36,6 +36,7 @@
 #define LINK_ALERT_BEEP_MS 200
 #define REMOTE_HORN_MAX_MS 3000
 #define CONNECTION_BEEP_MS 160
+#define ESPNOW_CHANNEL 1
 
 VescUart VESC;
 
@@ -86,6 +87,8 @@ volatile int16_t throttle = 0;
 volatile int16_t speed = 0;
 volatile uint8_t speedLevel = 1;
 volatile uint8_t buttons = 0;
+uint8_t statusTargetMac[6] = {};
+bool hasStatusTarget = false;
 
 int16_t smoothedThrottle = 0;
 int16_t lastPwmValue = -1;
@@ -159,8 +162,9 @@ void setupESPNOW() {
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
   WiFi.setTxPower(WIFI_POWER_19_5dBm);
-  // 添加这行：固定信道
-  WiFi.channel(1);
+  // 固定信道，必须与发射端一致。
+  WiFi.channel(ESPNOW_CHANNEL);
+  esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
   if (esp_now_init() != ESP_OK) {
     Serial.println("ESP-NOW初始化失败！");
     return;
@@ -169,7 +173,7 @@ void setupESPNOW() {
   // 添加固定发射器配对
   esp_now_peer_info_t peer = {};
   memcpy(peer.peer_addr, transmitterMac, 6);
-  peer.channel = 0;
+  peer.channel = ESPNOW_CHANNEL;
   peer.encrypt = false;
 
   if (esp_now_add_peer(&peer) != ESP_OK) {
@@ -179,7 +183,7 @@ void setupESPNOW() {
 
   esp_now_peer_info_t s3Peer = {};
   memcpy(s3Peer.peer_addr, s3TransmitterMac, 6);
-  s3Peer.channel = 0;
+  s3Peer.channel = ESPNOW_CHANNEL;
   s3Peer.encrypt = false;
   esp_now_del_peer(s3TransmitterMac);
   if (esp_now_add_peer(&s3Peer) != ESP_OK) {
@@ -214,6 +218,7 @@ void setupESPNOW() {
     const bool signalConnectionSuccess = shouldSignalReceiverConnectionSuccess(connected, failsafeActive);
 
     // 更新数据
+    rememberStatusTarget(mac, statusTargetMac, hasStatusTarget);
     throttle = pkt->throttle;
     speedLevel = pkt->speedLevel;
     buttons = pkt->buttons;
@@ -388,7 +393,9 @@ void sendTelemetry() {
   }
   pkt.checksum = sum;
 
-  esp_now_send(transmitterMac, (uint8_t *)&pkt, sizeof(pkt));
+  if (hasStatusTarget) {
+    esp_now_send(statusTargetMac, (uint8_t *)&pkt, sizeof(pkt));
+  }
 }
 
 

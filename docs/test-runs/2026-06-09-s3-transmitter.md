@@ -375,3 +375,60 @@ S3 THR:0 SPD:1 BTN:00 [LOST] BAT:OK
 
 - 底部右侧是否显示 `FPS n`。
 - `FPS n` 是否与 `TOUCH x,y` 或底部占位提示重叠。
+
+## S3 发射端与接收端联调复测
+
+### DMA 确认
+
+| 项目 | 结果 |
+|---|---|
+| `S3_LVGL_DISPLAY_USE_DMA` | `1` |
+| LVGL flush | `display.pushImageDMA()` |
+| LVGL buffer ready | `display.waitDMA()` 后调用 `lv_disp_flush_ready()` |
+
+### 初次联调现象
+
+| 端 | 日志 | 判断 |
+|---|---|---|
+| S3 发射端 COM7 | `S3 THR:0 SPD:1 BTN:00 [LOST] BAT:OK` | 未收到状态包 |
+| 接收端 COM10 | `THR:   0 SPD:1 BTN:00 [FAILSAFE]` | 未进入稳定连接 |
+
+### 修复内容
+
+- 接收端把 `StatusPacket` 回发目标从固定 C3 发射端 MAC 改为最后一个合法发射器 MAC。
+- C3 发射端、S3 发射端、接收端 ESP-NOW peer 信道均显式固定为 1。
+
+### 验证结果
+
+| 项目 | 结果 |
+|---|---|
+| `pio test -e native` | PASS，16/16 |
+| `pio run -e receiver` | SUCCESS |
+| `pio run -e transmitter` | SUCCESS |
+| `pio run -e s3_transmitter` | SUCCESS，RAM 40.3%，Flash 29.9% |
+| `pio run -e s3_lvgl_probe` | SUCCESS |
+| `pio run -e receiver -t upload --upload-port COM10` | SUCCESS |
+| `pio run -e s3_transmitter -t upload --upload-port COM7` | SUCCESS |
+| C3 基础发射端上传 | 未执行，当前无 COM3 |
+
+### 联调日志
+
+S3 发射端 20 秒稳定输出：
+
+```text
+S3 THR:0 SPD:1 BTN:00 [OK] BAT:OK
+S3 THR:0 SPD:1 BTN:00 [OK] BAT:OK
+S3 THR:0 SPD:1 BTN:00 [OK] BAT:OK
+```
+
+接收端 20 秒稳定输出：
+
+```text
+THR:   0 SPD:1 BTN:00
+PWM value: 76 (throttle=0)
+```
+
+### 观察项
+
+- S3 曾出现一次 `BROWNOUT_RST`，建议继续观察供电和 USB 线/电源能力。
+- 当前 S3 摇杆、按钮、档位 GPIO 仍为软件占位，实体输入功能需等硬件定稿后再完整验证。

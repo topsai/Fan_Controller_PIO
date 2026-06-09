@@ -644,3 +644,38 @@
 
 - 目视确认底部右侧是否显示 `FPS n`。
 - 触摸屏幕时确认 `TOUCH x,y` 和 `FPS n` 不互相遮挡。
+
+## 2026-06-09 S3 发射端与接收端联调修复
+
+### 现象
+
+- DMA 已确认开启：`S3_LVGL_DISPLAY_USE_DMA=1`，LVGL flush 使用 `pushImageDMA()` 并在 `waitDMA()` 后释放 LVGL buffer。
+- 初次联调时 S3 串口持续显示 `[LOST]`。
+- 接收端串口显示 `[FAILSAFE]`，PWM 保持中位 76。
+- S3 启动日志曾出现一次 `BROWNOUT_RST`，需继续观察供电稳定性。
+
+### 根因
+
+接收端已经允许 S3 发射端 MAC，但 `StatusPacket` 仍固定回发给 C3 基础发射端 MAC，S3 无法收到状态包，因此页面判定断联。
+
+### 已修改
+
+- 接收端收到合法发射器控制包后，记录最后一个合法发射器 MAC。
+- 接收端状态包回发给最后一个合法发射器，而不是固定发给 C3 发射端。
+- C3 发射端、S3 发射端、接收端均显式固定 ESP-NOW 信道为 1。
+- 新增 `rememberStatusTarget()` 单元测试，覆盖 S3 MAC 被记录为状态回传目标。
+
+### 验证
+
+- `pio test -e native`：PASS，16/16。
+- `pio run -e receiver`：SUCCESS。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio run -e s3_lvgl_probe`：SUCCESS。
+- `pio run -e receiver -t upload --upload-port COM10`：SUCCESS。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+- COM7/COM10 20 秒联调：
+  - S3 连续输出 `[OK]`。
+  - 接收端持续输出 `THR:   0 SPD:1 BTN:00`。
+  - 接收端 PWM 中位为 76。
+  - 未再进入 `[FAILSAFE]`。

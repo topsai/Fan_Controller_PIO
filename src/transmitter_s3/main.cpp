@@ -4,6 +4,7 @@
 #include <Wire.h>
 #include <WiFi.h>
 #include <esp_now.h>
+#include <esp_wifi.h>
 #include <math.h>
 #include "beep_profiles.h"
 #include "control_logic.h"
@@ -41,6 +42,7 @@ constexpr uint16_t CONTROL_SEARCH_INTERVAL_MS = 50;
 constexpr uint16_t DISPLAY_INTERVAL_MS = 200;
 constexpr uint16_t LOCAL_SENSOR_INTERVAL_MS = 500;
 constexpr uint16_t CONNECTION_TIMEOUT_MS = 500;
+constexpr uint8_t ESPNOW_CHANNEL = 1;
 constexpr uint8_t LCD_BRIGHTNESS = 140;
 constexpr int JOYSTICK_DEADZONE = 50;
 constexpr int ADC_CENTER = 2048;
@@ -558,7 +560,8 @@ void setupEspNow() {
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
   WiFi.setTxPower(WIFI_POWER_8_5dBm);
-  WiFi.channel(1);
+  WiFi.channel(ESPNOW_CHANNEL);
+  esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
   if (esp_now_init() != ESP_OK) {
     Serial.println("ESP-NOW init failed");
     return;
@@ -566,7 +569,7 @@ void setupEspNow() {
 
   esp_now_peer_info_t peer = {};
   memcpy(peer.peer_addr, receiverMac, sizeof(receiverMac));
-  peer.channel = 0;
+  peer.channel = ESPNOW_CHANNEL;
   peer.encrypt = false;
   esp_now_del_peer(receiverMac);
   if (esp_now_add_peer(&peer) != ESP_OK) {

@@ -141,6 +141,17 @@ void test_display_fps_rounds_from_frame_count_and_elapsed_time() {
   TEST_ASSERT_EQUAL_UINT16(0, displayFpsForFrameCount(10, 0));
 }
 
+void test_receiver_status_target_tracks_last_valid_transmitter() {
+  const uint8_t s3Mac[] = {0x48, 0xCA, 0x43, 0x9A, 0xA9, 0xB0};
+  uint8_t statusTarget[] = {0xAC, 0xEB, 0xE6, 0x44, 0xD5, 0x54};
+  bool hasTarget = false;
+
+  rememberStatusTarget(s3Mac, statusTarget, hasTarget);
+
+  TEST_ASSERT_TRUE(hasTarget);
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(s3Mac, statusTarget, 6);
+}
+
 void setup() {
   UNITY_BEGIN();
   RUN_TEST(test_pwm_mapping_uses_vesc_servo_range);
@@ -158,6 +169,7 @@ void setup() {
   RUN_TEST(test_s3_lvgl_timing_uses_low_latency_profile);
   RUN_TEST(test_s3_lvgl_display_dma_is_enabled);
   RUN_TEST(test_display_fps_rounds_from_frame_count_and_elapsed_time);
+  RUN_TEST(test_receiver_status_target_tracks_last_valid_transmitter);
   UNITY_END();
 }
 

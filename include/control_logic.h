@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 inline int clampInt(int value, int minValue, int maxValue) {
   if (value < minValue) return minValue;
@@ -134,4 +135,12 @@ inline uint16_t displayFpsForFrameCount(uint16_t frameCount, uint32_t elapsedMs)
     return 0;
   }
   return (uint16_t)(((uint32_t)frameCount * 1000U + elapsedMs / 2U) / elapsedMs);
+}
+
+inline void rememberStatusTarget(const uint8_t *sourceMac, uint8_t *targetMac, bool &hasTarget) {
+  if (sourceMac == nullptr || targetMac == nullptr) {
+    return;
+  }
+  memcpy(targetMac, sourceMac, 6);
+  hasTarget = true;
 }
