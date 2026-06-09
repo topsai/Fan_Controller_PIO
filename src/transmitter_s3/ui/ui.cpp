@@ -6,6 +6,17 @@
 
 namespace {
 
+lv_obj_t *settingsPanel = nullptr;
+lv_obj_t *settingsTitleLabel = nullptr;
+lv_obj_t *settingsCenterLabel = nullptr;
+lv_obj_t *settingsHintLabel = nullptr;
+lv_obj_t *settingsMinusButton = nullptr;
+lv_obj_t *settingsPlusButton = nullptr;
+lv_obj_t *settingsCalButton = nullptr;
+lv_obj_t *settingsCloseButton = nullptr;
+bool settingsVisible = false;
+bool touchWasPressed = false;
+
 lv_obj_t *batteryArc() {
   return ui_ArcBattery;
 }
@@ -40,6 +51,66 @@ lv_obj_t *statusVoltageArc() {
 
 lv_obj_t *statusVoltageLabel() {
   return ui_LabelStatusVoltage;
+}
+
+lv_obj_t *createSettingsButton(lv_obj_t *parent, const char *text, int16_t x, int16_t y, int16_t w, int16_t h) {
+  lv_obj_t *button = lv_btn_create(parent);
+  lv_obj_set_size(button, w, h);
+  lv_obj_set_pos(button, x, y);
+  lv_obj_set_style_radius(button, 6, LV_PART_MAIN);
+  lv_obj_set_style_bg_color(button, lv_color_hex(0x202833), LV_PART_MAIN);
+  lv_obj_t *label = lv_label_create(button);
+  lv_label_set_text(label, text);
+  lv_obj_set_style_text_color(label, lv_color_white(), LV_PART_MAIN);
+  lv_obj_center(label);
+  return button;
+}
+
+void createSettingsPanel() {
+  if (settingsPanel != nullptr) {
+    return;
+  }
+
+  settingsPanel = lv_obj_create(lv_scr_act());
+  lv_obj_set_size(settingsPanel, 210, 170);
+  lv_obj_align(settingsPanel, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_set_style_radius(settingsPanel, 8, LV_PART_MAIN);
+  lv_obj_set_style_bg_color(settingsPanel, lv_color_hex(0x101820), LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(settingsPanel, LV_OPA_90, LV_PART_MAIN);
+  lv_obj_set_style_border_color(settingsPanel, lv_color_hex(0x00D8FF), LV_PART_MAIN);
+  lv_obj_set_style_border_width(settingsPanel, 1, LV_PART_MAIN);
+  lv_obj_clear_flag(settingsPanel, LV_OBJ_FLAG_SCROLLABLE);
+
+  settingsTitleLabel = lv_label_create(settingsPanel);
+  lv_label_set_text(settingsTitleLabel, "JOYSTICK SET");
+  lv_obj_set_style_text_color(settingsTitleLabel, lv_color_hex(0x00D8FF), LV_PART_MAIN);
+  lv_obj_align(settingsTitleLabel, LV_ALIGN_TOP_MID, 0, 8);
+
+  settingsCenterLabel = lv_label_create(settingsPanel);
+  lv_label_set_text(settingsCenterLabel, "CENTER 2048");
+  lv_obj_set_style_text_color(settingsCenterLabel, lv_color_white(), LV_PART_MAIN);
+  lv_obj_align(settingsCenterLabel, LV_ALIGN_TOP_MID, 0, 36);
+
+  settingsMinusButton = createSettingsButton(settingsPanel, "-10", 12, 68, 52, 36);
+  settingsCalButton = createSettingsButton(settingsPanel, "CAL", 78, 68, 52, 36);
+  settingsPlusButton = createSettingsButton(settingsPanel, "+10", 144, 68, 52, 36);
+  settingsCloseButton = createSettingsButton(settingsPanel, "EXIT", 60, 116, 90, 34);
+
+  settingsHintLabel = lv_label_create(settingsPanel);
+  lv_label_set_text(settingsHintLabel, "Output locked");
+  lv_obj_set_style_text_color(settingsHintLabel, lv_color_hex(0xFFD23F), LV_PART_MAIN);
+  lv_obj_align(settingsHintLabel, LV_ALIGN_BOTTOM_MID, 0, -4);
+
+  lv_obj_add_flag(settingsPanel, LV_OBJ_FLAG_HIDDEN);
+}
+
+bool touchInside(lv_obj_t *obj, int16_t x, int16_t y) {
+  if (obj == nullptr) {
+    return false;
+  }
+  lv_area_t coords;
+  lv_obj_get_coords(obj, &coords);
+  return x >= coords.x1 && x <= coords.x2 && y >= coords.y1 && y <= coords.y2;
 }
 
 }  // namespace
@@ -97,6 +168,8 @@ void s3_ui_init() {
   if (statusVoltageLabel() != nullptr) {
     lv_label_set_text(statusVoltageLabel(), "--.-V");
   }
+
+  createSettingsPanel();
 }
 
 void s3_ui_update(const S3UiState &state) {
@@ -105,16 +178,17 @@ void s3_ui_update(const S3UiState &state) {
   const int16_t throttleBarValue = s3ThrottleBarValue(state.joystickValue);
   const int16_t statusVoltageValue = s3StatusVoltageForArc(state.connected, state.receiverVoltageX100);
 
-  if (state.connected) {
+  if (!state.armed) {
+    snprintf(buffer, sizeof(buffer), "LOCK");
+  } else if (state.connected) {
     snprintf(buffer, sizeof(buffer), "OK");
   } else {
     snprintf(buffer, sizeof(buffer), "LOST");
   }
   if (statusValueLabel() != nullptr) {
     lv_label_set_text(statusValueLabel(), buffer);
-    lv_obj_set_style_text_color(statusValueLabel(),
-                                state.connected ? lv_color_hex(0x00D86A) : lv_color_hex(0xFF4040),
-                                LV_PART_MAIN);
+    const uint32_t color = !state.armed ? 0xFFD23F : (state.connected ? 0x00D86A : 0xFF4040);
+    lv_obj_set_style_text_color(statusValueLabel(), lv_color_hex(color), LV_PART_MAIN);
   }
 
   if (controlValueLabel() != nullptr) {
@@ -168,10 +242,51 @@ void s3_ui_update(const S3UiState &state) {
     }
     lv_label_set_text(statusVoltageLabel(), buffer);
   }
+
+  s3_ui_set_settings_visible(state.settingsMode);
+  if (settingsCenterLabel != nullptr) {
+    snprintf(buffer, sizeof(buffer), "CENTER %d", state.joystickCenter);
+    lv_label_set_text(settingsCenterLabel, buffer);
+  }
+  if (settingsHintLabel != nullptr) {
+    lv_label_set_text(settingsHintLabel, state.armed ? "Output locked" : "Re-arm after exit");
+  }
 }
 
-void s3_ui_set_touch(bool pressed, int16_t x, int16_t y) {
-  (void)pressed;
-  (void)x;
-  (void)y;
+void s3_ui_set_settings_visible(bool visible) {
+  settingsVisible = visible;
+  if (settingsPanel == nullptr) {
+    return;
+  }
+  if (visible) {
+    lv_obj_clear_flag(settingsPanel, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(settingsPanel);
+  } else {
+    lv_obj_add_flag(settingsPanel, LV_OBJ_FLAG_HIDDEN);
+  }
+}
+
+S3UiTouchAction s3_ui_set_touch(bool pressed, int16_t x, int16_t y) {
+  if (!pressed) {
+    touchWasPressed = false;
+    return S3UiTouchAction::None;
+  }
+  if (touchWasPressed || !settingsVisible) {
+    return S3UiTouchAction::None;
+  }
+  touchWasPressed = true;
+
+  if (touchInside(settingsCalButton, x, y)) {
+    return S3UiTouchAction::CalibrateCenter;
+  }
+  if (touchInside(settingsMinusButton, x, y)) {
+    return S3UiTouchAction::CenterMinus;
+  }
+  if (touchInside(settingsPlusButton, x, y)) {
+    return S3UiTouchAction::CenterPlus;
+  }
+  if (touchInside(settingsCloseButton, x, y)) {
+    return S3UiTouchAction::CloseSettings;
+  }
+  return S3UiTouchAction::None;
 }

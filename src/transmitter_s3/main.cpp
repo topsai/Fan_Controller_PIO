@@ -47,6 +47,9 @@ constexpr uint8_t ESPNOW_CHANNEL = 1;
 constexpr uint8_t LCD_BRIGHTNESS = 140;
 constexpr int JOYSTICK_DEADZONE = 50;
 constexpr int ADC_CENTER = 2048;
+constexpr int ARM_THROTTLE_THRESHOLD = 50;
+constexpr int THROTTLE_SLEW_STEP = 40;
+constexpr int JOYSTICK_CENTER_ADJUST_STEP = 10;
 constexpr uint8_t LOW_BATTERY_THRESHOLD = 20;
 constexpr uint8_t CRITICAL_BATTERY_THRESHOLD = 10;
 
@@ -217,9 +220,14 @@ bool auxI2cFound[128] = {};
 uint8_t receiverMac[] = {0xAC, 0xEB, 0xE6, 0x44, 0xC5, 0x90};
 
 int joystickCenter = ADC_CENTER;
+int16_t joystickRawValue = 0;
 int16_t joystickValue = 0;
 uint8_t speedLevel = 1;
 uint8_t buttonState = 0;
+bool transmitterArmed = false;
+bool settingsMode = false;
+bool joystickCalibrateRequested = false;
+int16_t joystickCenterAdjust = 0;
 bool connected = false;
 uint32_t lastRecvTime = 0;
 int16_t rssiValue = -100;
@@ -471,7 +479,14 @@ void calibrateJoystickCenter() {
 }
 
 void readInputs() {
-  joystickValue = joystickToThrottle(analogRead(JOYSTICK_PIN), joystickCenter, JOYSTICK_DEADZONE);
+  const int16_t targetThrottle = joystickToThrottle(analogRead(JOYSTICK_PIN), joystickCenter, JOYSTICK_DEADZONE);
+  joystickRawValue = targetThrottle;
+  if (!transmitterArmed && canArmTransmitter(targetThrottle, ARM_THROTTLE_THRESHOLD)) {
+    transmitterArmed = true;
+    beep(BEEP_FREQ_CONNECTED, 80);
+  }
+  const int16_t safeTarget = settingsMode ? 0 : safeThrottleForArming(targetThrottle, transmitterArmed);
+  joystickValue = slewLimitedThrottle(joystickValue, safeTarget, THROTTLE_SLEW_STEP);
 
   const bool sw1 = !digitalRead(SWITCH_PIN_1);
   const bool sw2 = !digitalRead(SWITCH_PIN_2);
@@ -485,18 +500,25 @@ void readInputs() {
   }
 
   uint8_t nextButtons = 0;
-  if (!digitalRead(BUTTON_1_PIN)) {
-    nextButtons |= 0x01;
-  }
+  const bool button1Down = !digitalRead(BUTTON_1_PIN);
   if (!digitalRead(BUTTON_2_PIN)) {
     nextButtons |= 0x02;
   }
   static uint8_t lastButtons = 0;
-  if ((nextButtons & ~lastButtons) != 0) {
+  static bool lastButton1Down = false;
+  if (button1Down && !lastButton1Down) {
+    settingsMode = !settingsMode;
+    transmitterArmed = false;
+    joystickValue = 0;
+    beep(BEEP_FREQ_BUTTON, 50);
+  }
+  lastButton1Down = button1Down;
+
+  if ((nextButtons & ~lastButtons) != 0 && !settingsMode) {
     beep(BEEP_FREQ_BUTTON, 50);
   }
   lastButtons = nextButtons;
-  buttonState = nextButtons;
+  buttonState = settingsMode ? 0 : nextButtons;
 }
 
 void setupDisplay() {
@@ -531,7 +553,30 @@ void lvTouchReadCallback(lv_indev_drv_t *, lv_indev_data_t *data) {
     data->state = LV_INDEV_STATE_PRESSED;
     data->point.x = x;
     data->point.y = y;
-    s3_ui_set_touch(true, x, y);
+    const S3UiTouchAction action = s3_ui_set_touch(true, x, y);
+    switch (action) {
+      case S3UiTouchAction::CalibrateCenter:
+        joystickCalibrateRequested = true;
+        beep(BEEP_FREQ_BUTTON, 50);
+        break;
+      case S3UiTouchAction::CenterMinus:
+        joystickCenterAdjust -= JOYSTICK_CENTER_ADJUST_STEP;
+        beep(BEEP_FREQ_BUTTON, 30);
+        break;
+      case S3UiTouchAction::CenterPlus:
+        joystickCenterAdjust += JOYSTICK_CENTER_ADJUST_STEP;
+        beep(BEEP_FREQ_BUTTON, 30);
+        break;
+      case S3UiTouchAction::CloseSettings:
+        settingsMode = false;
+        transmitterArmed = false;
+        joystickValue = 0;
+        beep(BEEP_FREQ_BUTTON, 50);
+        break;
+      case S3UiTouchAction::None:
+      default:
+        break;
+    }
     return;
   }
   data->state = LV_INDEV_STATE_RELEASED;
@@ -606,7 +651,7 @@ void sendControlPacket() {
   ControlPacket pkt = {};
   pkt.head = 0xA5;
   pkt.type = 0x01;
-  pkt.throttle = joystickValue;
+  pkt.throttle = settingsMode ? 0 : joystickValue;
   pkt.speedLevel = speedLevel;
   pkt.buttons = buttonState;
   pkt.checksum = calcChecksum((const uint8_t *)&pkt, sizeof(pkt));
@@ -670,6 +715,9 @@ void updateDashboard() {
   state.qmcValid = qmc.valid;
   state.qmcHeadingDeg = qmc.headingDeg;
   state.displayFps = displayFps;
+  state.armed = transmitterArmed;
+  state.settingsMode = settingsMode;
+  state.joystickCenter = joystickCenter;
   s3_ui_update(state);
 }
 
@@ -701,6 +749,18 @@ void setup() {
 
 void loop() {
   readInputs();
+  if (joystickCenterAdjust != 0) {
+    joystickCenter = clampInt(joystickCenter + joystickCenterAdjust, 1, 4094);
+    joystickCenterAdjust = 0;
+    transmitterArmed = false;
+    joystickValue = 0;
+  }
+  if (joystickCalibrateRequested) {
+    joystickCalibrateRequested = false;
+    joystickValue = 0;
+    calibrateJoystickCenter();
+    transmitterArmed = false;
+  }
 
   const uint32_t now = millis();
   const uint32_t lvElapsedMs = now - lastLvTickMs;

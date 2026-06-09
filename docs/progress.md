@@ -893,3 +893,44 @@ SquareLine 页面已经承接主要参数显示后，删除 `src/transmitter_s3/
 - `pio run -e receiver`：SUCCESS。
 - `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
 - `git diff --check`：PASS，仅有 CRLF 换行提示。
+
+## 2026-06-09 双版本发射端上电解锁/油门斜率/摇杆设置页
+
+### 目标
+
+为 C3 OLED 基础版和 S3 触摸高级版同步加入上电解锁、油门变化率限制和摇杆中位设置入口。按钮 1 改为本地设置页面入口；S3 版本额外提供触摸校准和中位微调。
+
+### 已修改
+
+- `include/control_logic.h` 新增：
+  - `canArmTransmitter()`：只有摇杆回到安全阈值内才允许解锁。
+  - `safeThrottleForArming()`：未解锁时强制 throttle 为 0。
+  - `slewLimitedThrottle()`：限制 throttle 单次变化步进。
+- C3 `transmitter`：
+  - 上电后必须摇杆回中才会解锁；未解锁前发送 throttle 为 0。
+  - 发送 throttle 经过斜率限制，避免瞬间大油门。
+  - 按钮 1 进入/退出 OLED 设置页面，按钮 1 不再作为控制包 bit0 上报。
+  - 设置页面内输出锁定为 0；按钮 2 执行摇杆中位校准。
+- S3 `s3_transmitter`：
+  - 同步加入上电解锁和 throttle 斜率限制。
+  - 按钮 1 进入/退出触摸设置覆盖层，按钮 1 不再作为控制包 bit0 上报。
+  - 设置页面内输出锁定为 0。
+  - 触摸 `CAL` 重新采样中位，触摸 `-10` / `+10` 微调中位，触摸 `EXIT` 退出。
+  - 未解锁时 `ui_LabelStatus` 显示 `LOCK`，颜色为黄色。
+- 更新 `docs/user-guide.md`、`docs/hardware.md`、`docs/squareline-data-binding.md`。
+
+### 验证
+
+- 新增 native 单测：
+  - `test_transmitter_arming_requires_centered_joystick`
+  - `test_transmitter_safety_forces_zero_until_armed`
+  - `test_throttle_slew_rate_limits_step_changes`
+- 初次运行 `pio test -e native` 因 helper 未实现失败，随后实现后通过。
+- `pio test -e native`：PASS，24/24。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio run -e receiver`：SUCCESS。
+- `git diff --check`：PASS，仅有 CRLF 换行提示。
+- `pio run -e transmitter -t upload --upload-port COM3`：SUCCESS。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+- 实物 UI 和触摸设置页操作仍需人工观察确认。

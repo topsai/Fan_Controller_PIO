@@ -37,6 +37,24 @@ void test_joystick_center_calibration_averages_samples() {
   TEST_ASSERT_EQUAL_INT(2100, calibratedJoystickCenter(samples, 4, 2048));
 }
 
+void test_transmitter_arming_requires_centered_joystick() {
+  TEST_ASSERT_FALSE(canArmTransmitter(80, 50));
+  TEST_ASSERT_TRUE(canArmTransmitter(50, 50));
+  TEST_ASSERT_TRUE(canArmTransmitter(-50, 50));
+}
+
+void test_transmitter_safety_forces_zero_until_armed() {
+  TEST_ASSERT_EQUAL_INT16(0, safeThrottleForArming(700, false));
+  TEST_ASSERT_EQUAL_INT16(-300, safeThrottleForArming(-300, true));
+}
+
+void test_throttle_slew_rate_limits_step_changes() {
+  TEST_ASSERT_EQUAL_INT16(60, slewLimitedThrottle(0, 800, 60));
+  TEST_ASSERT_EQUAL_INT16(-60, slewLimitedThrottle(0, -800, 60));
+  TEST_ASSERT_EQUAL_INT16(95, slewLimitedThrottle(100, 95, 60));
+  TEST_ASSERT_EQUAL_INT16(-1000, slewLimitedThrottle(-980, -1200, 60));
+}
+
 void test_receiver_failsafe_clears_all_stale_control_inputs() {
   ReceiverControlState state = {
     800,
@@ -199,6 +217,9 @@ void setup() {
   RUN_TEST(test_pwm_mapping_defaults_invalid_speed_level_to_level_1);
   RUN_TEST(test_joystick_mapping_uses_calibrated_center_and_deadzone);
   RUN_TEST(test_joystick_center_calibration_averages_samples);
+  RUN_TEST(test_transmitter_arming_requires_centered_joystick);
+  RUN_TEST(test_transmitter_safety_forces_zero_until_armed);
+  RUN_TEST(test_throttle_slew_rate_limits_step_changes);
   RUN_TEST(test_receiver_failsafe_clears_all_stale_control_inputs);
   RUN_TEST(test_receiver_link_alert_beeps_immediately_then_every_two_seconds);
   RUN_TEST(test_receiver_link_alert_is_silent_when_connected_and_not_failsafe);

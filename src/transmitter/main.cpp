@@ -42,6 +42,8 @@
 #define OLED_HEIGHT 64
 #define OLED_ADDR 0x3C
 #define ESPNOW_CHANNEL 1
+#define ARM_THROTTLE_THRESHOLD 50
+#define THROTTLE_SLEW_STEP 40
 
 // ========== CW2015寄存器 ==========
 #define CW2015_ADDR 0x62         // CW2015 I2C地址 [^43^]
@@ -108,12 +110,16 @@ volatile bool sendTelemetryFlag = false;
 volatile uint32_t controlCounter = 0;
 
 // 输入状态
-volatile int16_t joystickValue = 0;  // 摇杆值 -1000~1000
+volatile int16_t joystickRawValue = 0;  // 原始映射摇杆值 -1000~1000
+volatile int16_t joystickValue = 0;     // 实际发送油门值 -1000~1000
 volatile uint8_t speedLevel = 1;     // 速度档位 1/2/3
 volatile uint8_t buttonState = 0;    // 按钮状态
 volatile bool button1Pressed = false;
 volatile bool button2Pressed = false;
 int joystickCenter = ADC_CENTER;
+bool transmitterArmed = false;
+bool settingsMode = false;
+bool joystickCalibrateRequested = false;
 
 // 连接状态
 volatile bool connected = false;
@@ -241,7 +247,14 @@ void setupTimer() {
 // ========== 输入读取函数 ==========
 void readJoystick() {
   int raw = analogRead(JOYSTICK_PIN);
-  joystickValue = joystickToThrottle(raw, joystickCenter, JOYSTICK_DEADZONE);
+  const int16_t targetThrottle = joystickToThrottle(raw, joystickCenter, JOYSTICK_DEADZONE);
+  joystickRawValue = targetThrottle;
+  if (!transmitterArmed && canArmTransmitter(targetThrottle, ARM_THROTTLE_THRESHOLD)) {
+    transmitterArmed = true;
+    beep(BEEP_FREQ_CONNECTED, 80);
+  }
+  const int16_t safeTarget = settingsMode ? 0 : safeThrottleForArming(targetThrottle, transmitterArmed);
+  joystickValue = slewLimitedThrottle(joystickValue, safeTarget, THROTTLE_SLEW_STEP);
 }
 
 void readSwitches() {
@@ -278,10 +291,11 @@ void readButtons() {
     lastBtn1 = rawBtn1;
     if (rawBtn1) {
       button1Pressed = true;
-      buttonState |= 0x01;
+      settingsMode = !settingsMode;
+      transmitterArmed = false;
+      joystickValue = 0;
+      buttonState = 0;
       beep(BEEP_FREQ_BUTTON, 50);  // 按键音
-    } else {
-      buttonState &= ~0x01;
     }
   }
 
@@ -290,7 +304,11 @@ void readButtons() {
     lastBtn2 = rawBtn2;
     if (rawBtn2) {
       button2Pressed = true;
-      buttonState |= 0x02;
+      if (settingsMode) {
+        joystickCalibrateRequested = true;
+      } else {
+        buttonState |= 0x02;
+      }
       beep(BEEP_FREQ_BUTTON, 50);  // 按键音
     } else {
       buttonState &= ~0x02;
@@ -451,6 +469,17 @@ void updateDisplay() {
   display.setTextSize(1);
   display.setCursor(0, 0);
 
+  if (settingsMode) {
+    display.println("SETTINGS");
+    display.printf("Center:%d\n", joystickCenter);
+    display.printf("Raw:%4d Out:%4d\n", joystickRawValue, joystickValue);
+    display.println("B2: Cal center");
+    display.println("B1: Exit");
+    display.println("Output locked");
+    display.display();
+    return;
+  }
+
   // 第1行：连接状态和信号
   if (connected) {
     display.printf("[OK]  BAT:%.2fV\n", voltageValue / 100.0);
@@ -464,7 +493,7 @@ void updateDisplay() {
   // 第3行：油门/刹车值
   const char *direction = joystickValue > 0 ? "THR" : "BRK";
   // display.printf("%s:%4d  BTN:%02X\n", direction, abs(joystickValue), buttonState);
-  display.printf("SPD:%d  %s:%4d\n", speedLevel, direction, abs(joystickValue));
+  display.printf("%s SPD:%d %s:%4d\n", transmitterArmed ? "ARM" : "LOCK", speedLevel, direction, abs(joystickValue));
   display.setTextSize(4);
   // display.println("30 KM");
   if (connected) {
@@ -522,6 +551,12 @@ void loop() {
   readJoystick();
   readSwitches();
   readButtons();
+  if (joystickCalibrateRequested) {
+    joystickCalibrateRequested = false;
+    joystickValue = 0;
+    calibrateJoystickCenter();
+    transmitterArmed = false;
+  }
   if (readBatteryFlag && cw2015Available) {
     portENTER_CRITICAL(&timerMux);
     readBatteryFlag = false;

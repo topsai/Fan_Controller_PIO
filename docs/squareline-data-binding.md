@@ -52,6 +52,8 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 
 旧版手写叠加参数层已经删除，包括标题、连接状态、档位/油门、速度、电池、BMP280、航向、按钮/RSSI、FPS、触摸坐标和占位 GPIO 提示。后续新增显示内容应优先在 SquareLine 创建控件，再在 `src/transmitter_s3/ui/ui.cpp` 里绑定数据。
 
+当前 S3 摇杆设置页是 `src/transmitter_s3/ui/ui.cpp` 创建的临时 LVGL 覆盖层，用于按钮 1 进入设置、触摸校准和中位微调。它不写入 `src/transmitter_s3/ui/generated/`，不会被 SquareLine 导出覆盖。后续如果要统一视觉风格，可以在 SquareLine 中创建正式设置页面，再把触摸动作绑定迁移过去。
+
 ## 电池 Arc 设置
 
 在 SquareLine 里：

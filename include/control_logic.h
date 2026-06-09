@@ -62,6 +62,29 @@ inline int calibratedJoystickCenter(const int *samples, size_t sampleCount, int 
   return (int)((sum + (long)sampleCount / 2) / (long)sampleCount);
 }
 
+inline bool canArmTransmitter(int16_t throttle, int16_t centerThreshold) {
+  return throttle >= -centerThreshold && throttle <= centerThreshold;
+}
+
+inline int16_t safeThrottleForArming(int16_t throttle, bool armed) {
+  return armed ? throttle : 0;
+}
+
+inline int16_t slewLimitedThrottle(int16_t currentThrottle, int16_t targetThrottle, int16_t maxStep) {
+  const int safeMaxStep = maxStep < 0 ? -maxStep : maxStep;
+  if (safeMaxStep == 0) {
+    return currentThrottle;
+  }
+  const int delta = (int)targetThrottle - (int)currentThrottle;
+  if (delta > safeMaxStep) {
+    return (int16_t)clampInt((int)currentThrottle + safeMaxStep, -1000, 1000);
+  }
+  if (delta < -safeMaxStep) {
+    return (int16_t)clampInt((int)currentThrottle - safeMaxStep, -1000, 1000);
+  }
+  return (int16_t)clampInt(targetThrottle, -1000, 1000);
+}
+
 struct ReceiverControlState {
   int16_t throttle;
   uint8_t speedLevel;
