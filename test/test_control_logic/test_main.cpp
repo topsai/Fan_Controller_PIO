@@ -176,7 +176,8 @@ void test_s3_lvgl_display_dma_is_enabled() {
 
 void test_s3_espnow_link_uses_stable_radio_profile() {
   TEST_ASSERT_TRUE(S3_ESPNOW_STATUS_TIMEOUT_MS >= 1000);
-  TEST_ASSERT_TRUE(S3_ESPNOW_TX_POWER_DBM_X4 >= 60);
+  TEST_ASSERT_EQUAL_UINT16(60, S3_ESPNOW_TX_POWER_DBM_X4);
+  TEST_ASSERT_TRUE(S3_ESPNOW_CONTROL_TASK_ENABLED);
 }
 
 void test_display_fps_rounds_from_frame_count_and_elapsed_time() {

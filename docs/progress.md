@@ -993,33 +993,40 @@ S3 未解锁时 `ui_LabelStatus` 被直接写成 `LOCK`，导致原本的连接�
 
 ### 现象
 
-S3 高级发射端使用过程中会间歇性显示或表现为断联。
+S3 高级发射端使用过程中会间歇性显示或表现为断联；随后接收端蜂鸣器也会隔一会儿发出断联/失控提示音。
 
 ### 分析
 
-- S3 原 ESP-NOW 发射功率设置为 `8.5dBm`，对实际遥控链路偏保守，边缘信号下更容易丢包。
-- S3 页面状态包超时原为 `500ms`；接收端遥测理论为 `20Hz`，但 LCD 刷新、I2C 读取、串口输出或无线重传造成短暂抖动时，UI 容易提前显示 `LOST`。
-- 接收端 failsafe 超时仍为 `2000ms`，本次没有放宽接收端安全保护。
+- 仅 S3 页面显示 `LOST` 时，可能是状态回包超时过紧；但接收端蜂鸣器发出断联音，说明接收端确实进入了 `!connected` 或 `failsafeActive`。
+- 接收端 failsafe 超时为 `2000ms`，只有超过 2 秒没收到合法控制包才会触发。
+- S3 原控制包发送依赖主 `loop()`；同一个 loop 里还运行 LVGL/LCD、触摸、AUX I2C、串口输出等任务，若某次主循环被阻塞或抖动过大，接收端可能误判失控。
+- 上一轮把 TX 提到 `19.5dBm` 可以增加链路余量，但也可能增加 S3 发热和供电压降风险，因此本轮改为 `15dBm` 中等功率，并优先保证控制包发送独立性。
 
 ### 已修改
 
 - `include/s3_runtime_config.h` 新增：
   - `S3_ESPNOW_STATUS_TIMEOUT_MS = 1000`
-  - `S3_ESPNOW_TX_POWER_DBM_X4 = 78`
+  - `S3_ESPNOW_TX_POWER_DBM_X4 = 60`
+  - `S3_ESPNOW_CONTROL_TASK_ENABLED = 1`
+  - `S3_ESPNOW_CONTROL_TASK_STACK_WORDS = 4096`
+  - `S3_ESPNOW_CONTROL_TASK_PRIORITY = 3`
 - S3 状态回包超时从 `500ms` 调整到 `1000ms`。
-- S3 WiFi/ESP-NOW 发射功率从 `8.5dBm` 调整到 `19.5dBm`。
+- S3 WiFi/ESP-NOW 发射功率使用 `15dBm`，平衡链路余量、发热和供电压降。
+- S3 控制包发送从主 `loop()` 移到独立 FreeRTOS 任务 `s3_ctrl_tx`。
+- `s3_ctrl_tx` 已连接时按 `10ms` 周期发送，未连接搜索时按 `50ms` 周期发送。
 - S3 启动日志同步显示当前 WiFi TX dBm。
 
 ### 验证
 
 - 新增 native 单测 `test_s3_espnow_link_uses_stable_radio_profile`。
-- 初次运行 `pio test -e native` 因新配置未实现失败，随后实现后通过。
+- 初次运行 `pio test -e native` 因新配置/控制任务配置未实现失败，随后实现后通过。
 - `pio test -e native`：PASS，29/29。
 - `pio run -e s3_transmitter`：SUCCESS。
 - `pio run -e transmitter`：SUCCESS。
 - `pio run -e receiver`：SUCCESS。
 - `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
-- 串口抓取尝试：COM7/COM10 均被占用，未能完成 15 秒在线日志确认。
+- COM7 10 秒串口日志：S3 连续输出 `[OK] BAT:OK`。
+- COM10 10 秒串口日志：接收端持续 `THR:0 SPD:1 BTN:00` 和 `PWM value: 76`，未见 `[FAILSAFE]` 或断联提示日志。
 
 ## 2026-06-09 S3 电量/BMP280 瞬时归零修复
 

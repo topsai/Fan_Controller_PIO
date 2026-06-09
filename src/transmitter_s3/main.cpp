@@ -250,12 +250,14 @@ int16_t rssiValue = -100;
 uint16_t receiverVoltageX100 = 0;
 uint16_t receiverSpeed = 0;
 bool lowBatteryWarned = false;
-uint32_t lastControlMs = 0;
 uint32_t lastDisplayMs = 0;
 uint32_t lastLocalSensorMs = 0;
 uint32_t lastDebugMs = 0;
 uint32_t lastLinkAlertMs = 0;
 uint32_t lastLvglHandlerMs = 0;
+TaskHandle_t controlTaskHandle = nullptr;
+
+void startControlSendTask();
 
 uint8_t calcChecksum(const uint8_t *data, uint8_t len) {
   uint8_t sum = 0;
@@ -694,6 +696,7 @@ void setupEspNow() {
 
   Serial.print("S3 transmitter MAC: ");
   Serial.println(WiFi.macAddress());
+  startControlSendTask();
 }
 
 void sendControlPacket() {
@@ -705,6 +708,30 @@ void sendControlPacket() {
   pkt.buttons = buttonState;
   pkt.checksum = calcChecksum((const uint8_t *)&pkt, sizeof(pkt));
   esp_now_send(receiverMac, (const uint8_t *)&pkt, sizeof(pkt));
+}
+
+void controlSendTask(void *) {
+  TickType_t lastWake = xTaskGetTickCount();
+  for (;;) {
+    sendControlPacket();
+    const uint16_t intervalMs = connected ? CONTROL_CONNECTED_INTERVAL_MS : CONTROL_SEARCH_INTERVAL_MS;
+    vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(intervalMs));
+  }
+}
+
+void startControlSendTask() {
+#if S3_ESPNOW_CONTROL_TASK_ENABLED
+  if (controlTaskHandle != nullptr) {
+    return;
+  }
+  xTaskCreatePinnedToCore(controlSendTask,
+                          "s3_ctrl_tx",
+                          S3_ESPNOW_CONTROL_TASK_STACK_WORDS,
+                          nullptr,
+                          S3_ESPNOW_CONTROL_TASK_PRIORITY,
+                          &controlTaskHandle,
+                          0);
+#endif
 }
 
 void updateConnectionState() {
@@ -819,12 +846,6 @@ void loop() {
   if (lvElapsedMs > 0) {
     lv_tick_inc(lvElapsedMs);
     lastLvTickMs = now;
-  }
-
-  const uint16_t controlIntervalMs = connected ? CONTROL_CONNECTED_INTERVAL_MS : CONTROL_SEARCH_INTERVAL_MS;
-  if (now - lastControlMs >= controlIntervalMs) {
-    lastControlMs = now;
-    sendControlPacket();
   }
 
   if (now - lastLocalSensorMs >= LOCAL_SENSOR_INTERVAL_MS) {
