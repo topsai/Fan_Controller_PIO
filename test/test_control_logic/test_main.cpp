@@ -161,6 +161,14 @@ void test_s3_battery_arc_value_clamps_and_rounds_soc() {
   TEST_ASSERT_EQUAL_INT16(100, s3BatteryPercentForArc(true, 120.0f));
 }
 
+void test_s3_speed_label_color_uses_speed_bands() {
+  TEST_ASSERT_EQUAL_UINT32(0x00D86A, s3SpeedColorHex(0));
+  TEST_ASSERT_EQUAL_UINT32(0x00D86A, s3SpeedColorHex(14));
+  TEST_ASSERT_EQUAL_UINT32(0xFFD23F, s3SpeedColorHex(15));
+  TEST_ASSERT_EQUAL_UINT32(0xFFD23F, s3SpeedColorHex(29));
+  TEST_ASSERT_EQUAL_UINT32(0xFF4040, s3SpeedColorHex(30));
+}
+
 void setup() {
   UNITY_BEGIN();
   RUN_TEST(test_pwm_mapping_uses_vesc_servo_range);
@@ -180,6 +188,7 @@ void setup() {
   RUN_TEST(test_display_fps_rounds_from_frame_count_and_elapsed_time);
   RUN_TEST(test_receiver_status_target_tracks_last_valid_transmitter);
   RUN_TEST(test_s3_battery_arc_value_clamps_and_rounds_soc);
+  RUN_TEST(test_s3_speed_label_color_uses_speed_bands);
   UNITY_END();
 }
 

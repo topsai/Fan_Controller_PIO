@@ -9,6 +9,8 @@ lv_obj_t * ui_Screen1 = NULL;
 lv_obj_t * ui_bg_1 = NULL;
 lv_obj_t * ui_uiArcBattery = NULL;
 lv_obj_t * ui_uiLabelBattery = NULL;
+lv_obj_t * ui_uiLabelSpeed = NULL;
+lv_obj_t * ui_Label2 = NULL;
 // event funtions
 
 // build funtions
@@ -46,6 +48,25 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_style_text_opa(ui_uiLabelBattery, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_uiLabelBattery, &ui_font_Subtitle, LV_PART_MAIN | LV_STATE_DEFAULT);
 
+    ui_uiLabelSpeed = lv_label_create(ui_Screen1);
+    lv_obj_set_width(ui_uiLabelSpeed, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_uiLabelSpeed, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_uiLabelSpeed, 1);
+    lv_obj_set_y(ui_uiLabelSpeed, 4);
+    lv_obj_set_align(ui_uiLabelSpeed, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_uiLabelSpeed, "99");
+    lv_obj_set_style_text_color(ui_uiLabelSpeed, lv_color_hex(0xFD0202), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui_uiLabelSpeed, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_uiLabelSpeed, &ui_font_Number_big, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    ui_Label2 = lv_label_create(ui_Screen1);
+    lv_obj_set_width(ui_Label2, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_Label2, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_Label2, 76);
+    lv_obj_set_y(ui_Label2, 35);
+    lv_obj_set_align(ui_Label2, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_Label2, "Km");
+
 }
 
 void ui_Screen1_screen_destroy(void)
@@ -57,5 +78,7 @@ void ui_Screen1_screen_destroy(void)
     ui_bg_1 = NULL;
     ui_uiArcBattery = NULL;
     ui_uiLabelBattery = NULL;
+    ui_uiLabelSpeed = NULL;
+    ui_Label2 = NULL;
 
 }

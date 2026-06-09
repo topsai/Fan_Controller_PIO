@@ -26,7 +26,7 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 | 连接状态/VESC 电压 | Label | `ui_LabelStatus` | `connected/receiverVoltageX100` | `lv_label_set_text()` |
 | 档位和油门 | Label | `ui_LabelControl` | `speedLevel/joystickValue` | `lv_label_set_text()` |
 | 油门/刹车进度 | Bar 或 Arc | `ui_BarThrottle` | `joystickValue` | `lv_bar_set_value()` |
-| 轮速 | Label | `ui_LabelSpeed` | `receiverSpeed` | `lv_label_set_text()` |
+| 轮速 | Label | `ui_LabelSpeed` | `receiverSpeed` | `lv_label_set_text()` + `lv_obj_set_style_text_color()` |
 | BMP280 | Label | `ui_LabelBmp280` | `bmp280Valid/bmp280TemperatureC/bmp280PressureHpa` | `lv_label_set_text()` |
 | QMC5883L 航向 | Label | `ui_LabelHeading` | `qmcValid/qmcHeadingDeg` | `lv_label_set_text()` |
 | 按钮/RSSI | Label | `ui_LabelButtons` | `buttonState/rssiValue` | `lv_label_set_text()` |
@@ -35,6 +35,8 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 | 触摸点 | Object | `ui_DotTouch` | touch callback | `lv_obj_set_pos()` |
 
 当前 SquareLine 导出的电池 Arc 实例名是 `ui_uiArcBattery`，电量文字是 `ui_uiLabelBattery`，代码已按这两个实际名称绑定。推荐名仍然是 `ui_ArcBattery` / `ui_LabelBattery`，但最终以 `src/transmitter_s3/ui/generated/ui_Screen1.h` 中的 `extern lv_obj_t * ...` 声明为准。
+
+当前 SquareLine 导出的速度 Label 实例名是 `ui_uiLabelSpeed`。速度颜色规则在 `include/s3_ui_bindings.h` 的 `s3SpeedColorHex()` 中维护：低于 15 km/h 为绿色，15-29 km/h 为黄色，30 km/h 及以上为红色。
 
 ## 电池 Arc 设置
 

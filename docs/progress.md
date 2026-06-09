@@ -796,3 +796,23 @@ SquareLine 重新导出后，电池 Arc 的实际实例名是 `ui_uiArcBattery`�
 - `pio run -e s3_transmitter`：SUCCESS。
 - `pio test -e native`：PASS，17/17。
 - `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+
+## 2026-06-09 S3 速度 Label 数据绑定和颜色规则
+
+### 目标
+
+把 SquareLine 中新增的 `uiLabelSpeed` 接入真实轮速数据，并按速度区间显示不同文字颜色。
+
+### 已修改
+
+- 在 `include/s3_ui_bindings.h` 新增 `s3SpeedColorHex()`。
+- 速度颜色规则：`0-14 km/h` 绿色，`15-29 km/h` 黄色，`>=30 km/h` 红色。
+- 在 `src/transmitter_s3/ui/ui.cpp` 中绑定实际导出的 `ui_uiLabelSpeed`。
+- `ui_uiLabelSpeed` 显示 `S3UiState::receiverSpeed` 数值，并按 `s3SpeedColorHex()` 更新文字颜色。
+- 更新 `docs/squareline-data-binding.md`，记录速度 Label 的绑定方式。
+
+### 验证
+
+- 新增 native 单测 `test_s3_speed_label_color_uses_speed_bands`。
+- `pio test -e native`：PASS，18/18。
+- `pio run -e s3_transmitter`：SUCCESS。

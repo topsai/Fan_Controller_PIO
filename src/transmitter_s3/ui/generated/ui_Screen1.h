@@ -17,6 +17,8 @@ extern lv_obj_t * ui_Screen1;
 extern lv_obj_t * ui_bg_1;
 extern lv_obj_t * ui_uiArcBattery;
 extern lv_obj_t * ui_uiLabelBattery;
+extern lv_obj_t * ui_uiLabelSpeed;
+extern lv_obj_t * ui_Label2;
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus

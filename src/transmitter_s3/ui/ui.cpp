@@ -37,6 +37,10 @@ lv_obj_t *batteryValueLabel() {
   return ui_uiLabelBattery;
 }
 
+lv_obj_t *speedValueLabel() {
+  return ui_uiLabelSpeed;
+}
+
 }  // namespace
 
 void s3_ui_init() {
@@ -105,6 +109,11 @@ void s3_ui_init() {
   if (batteryValueLabel() != nullptr) {
     lv_label_set_text(batteryValueLabel(), "--%");
   }
+
+  if (speedValueLabel() != nullptr) {
+    lv_label_set_text(speedValueLabel(), "0");
+    lv_obj_set_style_text_color(speedValueLabel(), lv_color_hex(s3SpeedColorHex(0)), LV_PART_MAIN);
+  }
 }
 
 void s3_ui_update(const S3UiState &state) {
@@ -124,6 +133,11 @@ void s3_ui_update(const S3UiState &state) {
 
   snprintf(buffer, sizeof(buffer), "SPEED %u KM", state.receiverSpeed);
   lv_label_set_text(speedLabel, buffer);
+  if (speedValueLabel() != nullptr) {
+    snprintf(buffer, sizeof(buffer), "%u", state.receiverSpeed);
+    lv_label_set_text(speedValueLabel(), buffer);
+    lv_obj_set_style_text_color(speedValueLabel(), lv_color_hex(s3SpeedColorHex(state.receiverSpeed)), LV_PART_MAIN);
+  }
 
   if (state.cw2015Valid) {
     snprintf(buffer, sizeof(buffer), "BAT %.2fV %.1f%%", state.cw2015Voltage, state.cw2015Soc);
