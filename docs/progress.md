@@ -870,3 +870,26 @@ SquareLine 重新导出后，电池 Arc 的实际实例名是 `ui_uiArcBattery`�
 - `pio run -e receiver`：SUCCESS。
 - `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
 - `git diff --check`：PASS，仅有 CRLF 换行提示。
+
+## 2026-06-09 S3 旧手写参数层清理
+
+### 目标
+
+SquareLine 页面已经承接主要参数显示后，删除 `src/transmitter_s3/ui/ui.cpp` 中原来直接创建的调试/占位参数文字层，避免同一数据在屏幕上重复渲染。
+
+### 已修改
+
+- 删除手写创建的标题、连接状态、档位/油门、速度、电池、BMP280、航向、按钮/RSSI、FPS、触摸坐标和占位 GPIO 提示。
+- 删除旧手写油门 Bar，只保留 SquareLine 导出的 `ui_BarThrottle`。
+- `s3_ui_update()` 现在只更新 SquareLine 导出的正式控件。
+- `s3_ui_set_touch()` 暂时改为空实现；后续若需要显示触摸坐标/触摸点，应先在 SquareLine 中添加 `ui_LabelTouch` / `ui_DotTouch` 后再绑定。
+- 更新 `docs/squareline-data-binding.md`，记录旧手写层已删除，以及 FPS/触摸控件仍需 SquareLine 页面提供。
+
+### 验证
+
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio test -e native`：PASS，21/21。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e receiver`：SUCCESS。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+- `git diff --check`：PASS，仅有 CRLF 换行提示。

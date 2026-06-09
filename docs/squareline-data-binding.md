@@ -32,9 +32,9 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 | BMP280 | Label | `ui_LabelBmp280` | `bmp280Valid/bmp280PressureHpa/bmp280AltitudeM` | `lv_label_set_text()` |
 | QMC5883L 航向 | Label | `ui_LabelHeading` | `qmcValid/qmcHeadingDeg` | `lv_label_set_text()` |
 | 按钮/RSSI | Label | `ui_LabelButtons` | `buttonState/rssiValue` | `lv_label_set_text()` |
-| FPS | Label | `ui_LabelFps` | `displayFps` | `lv_label_set_text()` |
-| 触摸坐标 | Label | `ui_LabelTouch` | touch callback | `lv_label_set_text()` |
-| 触摸点 | Object | `ui_DotTouch` | touch callback | `lv_obj_set_pos()` |
+| FPS | Label | `ui_LabelFps` | `displayFps` | 待添加 SquareLine 控件后绑定 |
+| 触摸坐标 | Label | `ui_LabelTouch` | touch callback | 待添加 SquareLine 控件后绑定 |
+| 触摸点 | Object | `ui_DotTouch` | touch callback | 待添加 SquareLine 控件后绑定 |
 
 当前 SquareLine 导出的电池 Arc 实例名是 `ui_ArcBattery`，电量文字是 `ui_LabelBattery`，代码已按这两个实际名称绑定。最终以 `src/transmitter_s3/ui/generated/ui_Screen1.h` 中的 `extern lv_obj_t * ...` 声明为准。
 
@@ -42,13 +42,15 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 
 当前 SquareLine 导出的状态 Label 实例名是 `ui_LabelStatus`。连接时显示 `OK` 并使用绿色；断联时显示 `LOST` 并使用红色。VESC 电压由独立的 `ui_LabelStatusVoltage` 显示。
 
-当前 SquareLine 导出的档位 Label 实例名是 `ui_LabelControl`，显示格式为 `SPD n`。
+当前 SquareLine 导出的档位 Label 实例名是 `ui_LabelControl`，显示格式为单独档位数字，例如 `1`、`2`、`3`。
 
 当前 SquareLine 导出的油门/刹车 Bar 实例名是 `ui_BarThrottle`。代码侧会强制设置范围为 `-1000` 到 `1000`，模式为 `LV_BAR_MODE_SYMMETRICAL`，因此摇杆回中时 Bar 保持在中位；油门为正值向右增长并使用绿色，刹车为负值向左增长并使用橙色，回中时使用灰色。
 
 当前 SquareLine 导出的 VESC 电压控件是 `ui_ArcStatusVoltage` 和 `ui_LabelStatusVoltage`。Arc 范围固定为 `6-48V`，代码会把 `receiverVoltageX100` 四舍五入到整数伏并限制在该范围内；断联时 Arc 回到 `6V`，文字显示 `--.-V`。
 
 当前 SquareLine 导出的 BMP280 Label 实例名是 `ui_LabelBmp280`，显示格式为 `气压hPa 海拔m`。海拔由标准海平面气压 `1013.25hPa` 估算，只适合显示趋势，不等同于精密校准海拔。
+
+旧版手写叠加参数层已经删除，包括标题、连接状态、档位/油门、速度、电池、BMP280、航向、按钮/RSSI、FPS、触摸坐标和占位 GPIO 提示。后续新增显示内容应优先在 SquareLine 创建控件，再在 `src/transmitter_s3/ui/ui.cpp` 里绑定数据。
 
 ## 电池 Arc 设置
 
