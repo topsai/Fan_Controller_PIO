@@ -1,12 +1,12 @@
 {
-    "uiExportFolderPath": "",
+    "uiExportFolderPath": "C:\\Users\\John\\Desktop\\Arduino_Projects\\Fan_Controller_PIO\\src\\transmitter_s3\\ui\\generated",
     "projectExportFolderPath": "",
-    "drive_stdio": "",
+    "drive_stdio": "-",
     "drive_stdio_path": "",
-    "drive_posix": "",
+    "drive_posix": "-",
     "drive_posix_path": "",
-    "drive_win32": "",
+    "drive_win32": "-",
     "drive_win32_path": "",
-    "drive_fatfs": "",
+    "drive_fatfs": "-",
     "drive_fatfs_path": ""
 }

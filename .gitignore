@@ -5,6 +5,8 @@ compile_commands.json
 # SquareLine Studio local/cache artifacts
 tools/ui_projects/**/cache/
 tools/ui_projects/**/backup/
+tools/ui_projects/**/autosave/
+tools/ui_projects/**/project.info
 tools/ui_projects/**/*.log
 tools/ui_projects/**/*.tmp
 tools/ui_projects/**/*.bak

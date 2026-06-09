@@ -708,3 +708,22 @@
 - 不手动修改 `src/transmitter_s3/ui/generated/` 中的业务逻辑。
 - 重新导出后先运行 `pio run -e s3_transmitter`，自动补丁会处理当前已知的 SquareLine 颜色检查冲突。
 - 需要持久使用的控件名称应在 SquareLine 中命名清楚，再由 `s3_ui_update()` 引用。
+
+## 2026-06-09 S3 SquareLine 背景图页面导出
+
+### 目标
+
+验证 SquareLine Studio 中新增的 Screen 和背景图资源可以直接导出、编译并上传到 S3 正式发射端。
+
+### 已修改
+
+- SquareLine 导出新增 `src/transmitter_s3/ui/generated/ui_img_bg3_png.c`。
+- `ui_Screen1.c` 使用 `lv_img_create()` 和 `lv_img_set_src()` 加载背景图。
+- SquareLine 原始工程保留 `assets/bg3.png`。
+- `.gitignore` 增加 `autosave/` 和 `project.info`，避免提交本地自动保存包和本机元数据。
+
+### 验证
+
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+- COM7 短时监听未捕获到启动日志；屏幕视觉效果需以实物观察为准。

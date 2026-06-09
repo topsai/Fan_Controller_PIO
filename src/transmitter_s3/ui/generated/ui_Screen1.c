@@ -6,6 +6,7 @@
 #include "ui.h"
 
 lv_obj_t * ui_Screen1 = NULL;
+lv_obj_t * ui_bg_1 = NULL;
 // event funtions
 
 // build funtions
@@ -15,6 +16,14 @@ void ui_Screen1_screen_init(void)
     ui_Screen1 = lv_obj_create(NULL);
     lv_obj_clear_flag(ui_Screen1, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
+    ui_bg_1 = lv_img_create(ui_Screen1);
+    lv_img_set_src(ui_bg_1, &ui_img_bg3_png);
+    lv_obj_set_width(ui_bg_1, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_bg_1, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_align(ui_bg_1, LV_ALIGN_CENTER);
+    lv_obj_add_flag(ui_bg_1, LV_OBJ_FLAG_ADV_HITTEST);     /// Flags
+    lv_obj_clear_flag(ui_bg_1, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+
 }
 
 void ui_Screen1_screen_destroy(void)
@@ -23,5 +32,6 @@ void ui_Screen1_screen_destroy(void)
 
     // NULL screen variables
     ui_Screen1 = NULL;
+    ui_bg_1 = NULL;
 
 }
