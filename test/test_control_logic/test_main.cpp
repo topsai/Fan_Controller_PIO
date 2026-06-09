@@ -243,6 +243,21 @@ void test_s3_bmp280_altitude_uses_standard_sea_level_pressure() {
   TEST_ASSERT_TRUE(isnan(s3Bmp280AltitudeMeters(NAN)));
 }
 
+void test_s3_cw2015_reading_rejects_transient_zero_or_nan_values() {
+  TEST_ASSERT_TRUE(s3Cw2015ReadingIsPlausible(4.1f, 80.0f));
+  TEST_ASSERT_FALSE(s3Cw2015ReadingIsPlausible(0.0f, 0.0f));
+  TEST_ASSERT_FALSE(s3Cw2015ReadingIsPlausible(NAN, 80.0f));
+  TEST_ASSERT_FALSE(s3Cw2015ReadingIsPlausible(4.1f, NAN));
+  TEST_ASSERT_FALSE(s3Cw2015ReadingIsPlausible(4.1f, 120.0f));
+}
+
+void test_s3_bmp280_reading_rejects_transient_zero_or_nan_values() {
+  TEST_ASSERT_TRUE(s3Bmp280ReadingIsPlausible(802.0f, 1930.0f));
+  TEST_ASSERT_FALSE(s3Bmp280ReadingIsPlausible(0.0f, 0.0f));
+  TEST_ASSERT_FALSE(s3Bmp280ReadingIsPlausible(NAN, 100.0f));
+  TEST_ASSERT_FALSE(s3Bmp280ReadingIsPlausible(1000.0f, NAN));
+}
+
 void setup() {
   UNITY_BEGIN();
   RUN_TEST(test_pwm_mapping_uses_vesc_servo_range);
@@ -271,6 +286,8 @@ void setup() {
   RUN_TEST(test_s3_voltage_arc_value_clamps_to_vesc_display_range);
   RUN_TEST(test_s3_throttle_bar_keeps_center_and_uses_direction_colors);
   RUN_TEST(test_s3_bmp280_altitude_uses_standard_sea_level_pressure);
+  RUN_TEST(test_s3_cw2015_reading_rejects_transient_zero_or_nan_values);
+  RUN_TEST(test_s3_bmp280_reading_rejects_transient_zero_or_nan_values);
   UNITY_END();
 }
 

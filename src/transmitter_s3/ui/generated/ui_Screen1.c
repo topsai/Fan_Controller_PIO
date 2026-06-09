@@ -98,8 +98,8 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_style_text_align(ui_LabelControl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_LabelControl, &ui_font_Subtitle, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_radius(ui_LabelControl, 50, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(ui_LabelControl, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(ui_LabelControl, 50, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(ui_LabelControl, lv_color_hex(0x8E8E8E), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(ui_LabelControl, 100, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_LabelBmp280 = lv_label_create(ui_Screen1);
     lv_obj_set_width(ui_LabelBmp280, LV_SIZE_CONTENT);   /// 1
@@ -108,6 +108,8 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_y(ui_LabelBmp280, -67);
     lv_obj_set_align(ui_LabelBmp280, LV_ALIGN_CENTER);
     lv_label_set_text(ui_LabelBmp280, "0");
+    lv_obj_set_style_text_color(ui_LabelBmp280, lv_color_hex(0xE8C607), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui_LabelBmp280, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_BarThrottle = lv_bar_create(ui_Screen1);
     lv_obj_set_width(ui_BarThrottle, 150);

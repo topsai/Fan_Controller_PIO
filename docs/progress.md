@@ -988,3 +988,37 @@ S3 未解锁时 `ui_LabelStatus` 被直接写成 `LOCK`，导致原本的连接�
 - `pio run -e receiver`：SUCCESS。
 - `git diff --check`：PASS，仅有 CRLF 换行提示。
 - `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+
+## 2026-06-09 S3 电量/BMP280 瞬时归零修复
+
+### 现象
+
+S3 页面上的本机电量和 BMP280 气压/海拔偶发变成 `0` 或无效显示，随后又瞬间恢复。
+
+### 原因
+
+`readCw2015()` 和 `readBmp280()` 在每次读取开始时直接清空 `valid`。当 AUX I2C 出现一次短暂读取失败，或读到全 0 / `NaN` / 越界坏帧时，UI 会立即拿到无效或 0 值，导致 Arc/Label 闪一下。
+
+### 已修改
+
+- `include/s3_ui_bindings.h` 新增：
+  - `s3Cw2015ReadingIsPlausible()`
+  - `s3Bmp280ReadingIsPlausible()`
+- S3 读取层改为保留最后一次可信 CW2015/BMP280 数据。
+- 单次或少量连续读取失败不会清空显示值；连续失败 6 次才标记为无效。
+- CW2015 过滤 `0V/0%`、`NaN`、SOC 越界等不可信读数。
+- BMP280 过滤 `0hPa/0m`、`NaN`、气压/海拔越界等不可信读数。
+- 更新 `docs/squareline-data-binding.md`。
+
+### 验证
+
+- 新增 native 单测：
+  - `test_s3_cw2015_reading_rejects_transient_zero_or_nan_values`
+  - `test_s3_bmp280_reading_rejects_transient_zero_or_nan_values`
+- 初次运行 `pio test -e native` 因新 helper 未实现失败，随后实现后通过。
+- `pio test -e native`：PASS，28/28。
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e receiver`：第一次并行运行遇到 PlatformIO cache 权限/锁提示，单独重跑 SUCCESS。
+- `git diff --check`：PASS，仅有 CRLF 换行提示。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。

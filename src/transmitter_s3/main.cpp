@@ -42,6 +42,7 @@ constexpr uint16_t CONTROL_CONNECTED_INTERVAL_MS = 10;
 constexpr uint16_t CONTROL_SEARCH_INTERVAL_MS = 50;
 constexpr uint16_t DISPLAY_INTERVAL_MS = 200;
 constexpr uint16_t LOCAL_SENSOR_INTERVAL_MS = 500;
+constexpr uint8_t LOCAL_SENSOR_INVALIDATE_AFTER_FAILURES = 6;
 constexpr uint16_t CONNECTION_TIMEOUT_MS = 500;
 constexpr uint8_t ESPNOW_CHANNEL = 1;
 constexpr uint8_t LCD_BRIGHTNESS = 140;
@@ -162,6 +163,7 @@ public:
 struct Cw2015Data {
   bool present = false;
   bool valid = false;
+  uint8_t failureCount = 0;
   float voltage = NAN;
   float soc = NAN;
 };
@@ -185,6 +187,7 @@ struct Bmp280Cal {
 struct Bmp280Data {
   bool present = false;
   bool valid = false;
+  uint8_t failureCount = 0;
   uint8_t addr = 0;
   float temperatureC = NAN;
   float pressureHpa = NAN;
@@ -321,22 +324,37 @@ void initCw2015() {
 }
 
 void readCw2015() {
-  cw2015.valid = false;
   if (!cw2015.present) {
+    cw2015.valid = false;
     return;
   }
   uint8_t vcell[2] = {};
   uint8_t soc[2] = {};
   if (!i2cReadBytes(CW2015_ADDR, 0x02, vcell, sizeof(vcell))) {
+    if (++cw2015.failureCount >= LOCAL_SENSOR_INVALIDATE_AFTER_FAILURES) {
+      cw2015.valid = false;
+    }
     return;
   }
   if (!i2cReadBytes(CW2015_ADDR, 0x04, soc, sizeof(soc))) {
+    if (++cw2015.failureCount >= LOCAL_SENSOR_INVALIDATE_AFTER_FAILURES) {
+      cw2015.valid = false;
+    }
     return;
   }
   const uint16_t rawVoltage = ((uint16_t)vcell[0] << 8) | vcell[1];
-  cw2015.voltage = rawVoltage * 0.000305f;
-  cw2015.soc = soc[0] + soc[1] / 256.0f;
+  const float voltage = rawVoltage * 0.000305f;
+  const float socPercent = soc[0] + soc[1] / 256.0f;
+  if (!s3Cw2015ReadingIsPlausible(voltage, socPercent)) {
+    if (++cw2015.failureCount >= LOCAL_SENSOR_INVALIDATE_AFTER_FAILURES) {
+      cw2015.valid = false;
+    }
+    return;
+  }
+  cw2015.voltage = voltage;
+  cw2015.soc = socPercent;
   cw2015.valid = true;
+  cw2015.failureCount = 0;
 }
 
 bool loadBmp280Cal(uint8_t addr, Bmp280Cal &cal) {
@@ -401,20 +419,33 @@ void initBmp280() {
 }
 
 void readBmp280() {
-  bmp280.valid = false;
   if (!bmp280.present) {
+    bmp280.valid = false;
     return;
   }
   uint8_t data[6] = {};
   if (!i2cReadBytes(bmp280.addr, 0xF7, data, sizeof(data))) {
+    if (++bmp280.failureCount >= LOCAL_SENSOR_INVALIDATE_AFTER_FAILURES) {
+      bmp280.valid = false;
+    }
     return;
   }
   const int32_t adcP = ((int32_t)data[0] << 12) | ((int32_t)data[1] << 4) | (data[2] >> 4);
   const int32_t adcT = ((int32_t)data[3] << 12) | ((int32_t)data[4] << 4) | (data[5] >> 4);
-  bmp280.temperatureC = compensateBmp280Temperature(bmp280.cal, adcT);
-  bmp280.pressureHpa = compensateBmp280Pressure(bmp280.cal, adcP);
-  bmp280.altitudeM = s3Bmp280AltitudeMeters(bmp280.pressureHpa);
-  bmp280.valid = !isnan(bmp280.pressureHpa);
+  const float temperatureC = compensateBmp280Temperature(bmp280.cal, adcT);
+  const float pressureHpa = compensateBmp280Pressure(bmp280.cal, adcP);
+  const float altitudeM = s3Bmp280AltitudeMeters(pressureHpa);
+  if (!s3Bmp280ReadingIsPlausible(pressureHpa, altitudeM)) {
+    if (++bmp280.failureCount >= LOCAL_SENSOR_INVALIDATE_AFTER_FAILURES) {
+      bmp280.valid = false;
+    }
+    return;
+  }
+  bmp280.temperatureC = temperatureC;
+  bmp280.pressureHpa = pressureHpa;
+  bmp280.altitudeM = altitudeM;
+  bmp280.valid = true;
+  bmp280.failureCount = 0;
 }
 
 void initQmc5883l() {

@@ -1184,10 +1184,10 @@
                         "flags": 4096,
                         "strtype": "_style/Bg_Color",
                         "intarray": [
-                          255,
-                          255,
-                          255,
-                          50
+                          142,
+                          142,
+                          142,
+                          100
                         ],
                         "InheritedType": 7
                       }
@@ -1339,7 +1339,28 @@
               },
               {
                 "part": "lv.PART.MAIN",
-                "childs": [],
+                "childs": [
+                  {
+                    "nid": 10000,
+                    "strtype": "_style/StyleState",
+                    "strval": "DEFAULT",
+                    "childs": [
+                      {
+                        "nid": 10410,
+                        "flags": 4096,
+                        "strtype": "_style/Text_Color",
+                        "intarray": [
+                          232,
+                          198,
+                          7,
+                          255
+                        ],
+                        "InheritedType": 7
+                      }
+                    ],
+                    "InheritedType": 1
+                  }
+                ],
                 "nid": 1050,
                 "strtype": "LABEL/Style_main",
                 "strval": "lv.PART.MAIN, Text, Rectangle, Pad, Transform",

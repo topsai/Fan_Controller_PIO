@@ -14,6 +14,18 @@ inline int16_t s3BatteryPercentForArc(bool valid, float socPercent) {
   return (int16_t)clampInt((int)(socPercent + 0.5f), 0, 100);
 }
 
+inline bool s3Cw2015ReadingIsPlausible(float voltage, float socPercent) {
+  return isfinite(voltage) && isfinite(socPercent) &&
+         voltage >= 2.5f && voltage <= 5.5f &&
+         socPercent >= 0.0f && socPercent <= 100.0f;
+}
+
+inline bool s3Bmp280ReadingIsPlausible(float pressureHpa, float altitudeM) {
+  return isfinite(pressureHpa) && isfinite(altitudeM) &&
+         pressureHpa >= 300.0f && pressureHpa <= 1100.0f &&
+         altitudeM >= -1000.0f && altitudeM <= 10000.0f;
+}
+
 inline uint32_t s3SpeedColorHex(uint16_t speedKmh) {
   if (speedKmh >= 30) {
     return 0xFF4040;
