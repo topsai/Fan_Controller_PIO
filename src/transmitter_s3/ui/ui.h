@@ -22,8 +22,8 @@ struct S3UiState {
   uint16_t displayFps = 0;
 };
 
-void ui_init();
-void ui_update(const S3UiState &state);
-void ui_set_touch(bool pressed, int16_t x, int16_t y);
+void s3_ui_init();
+void s3_ui_update(const S3UiState &state);
+void s3_ui_set_touch(bool pressed, int16_t x, int16_t y);
 
 #endif

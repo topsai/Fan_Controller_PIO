@@ -1,3 +1,14 @@
 .pio/
 .cache/
 compile_commands.json
+
+# SquareLine Studio local/cache artifacts
+tools/ui_projects/**/cache/
+tools/ui_projects/**/backup/
+tools/ui_projects/**/*.log
+tools/ui_projects/**/*.tmp
+tools/ui_projects/**/*.bak
+
+# OS/editor noise
+Thumbs.db
+.DS_Store

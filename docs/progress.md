@@ -679,3 +679,32 @@
   - 接收端持续输出 `THR:   0 SPD:1 BTN:00`。
   - 接收端 PWM 中位为 76。
   - 未再进入 `[FAILSAFE]`。
+
+## 2026-06-09 S3 SquareLine Studio 工程接入
+
+### 目标
+
+把 SquareLine Studio 原始工程和导出的空页面纳入当前仓库，并让导出的 LVGL 代码可以和现有 S3 正式发射端业务 UI 共存。
+
+### 已修改
+
+- 新增 `.gitignore` 规则，忽略 SquareLine `cache/`、`backup/`、临时文件和系统噪声文件。
+- SquareLine 原始工程路径：`tools/ui_projects/s3_transmitter_squareline/`。
+- SquareLine 导出代码路径：`src/transmitter_s3/ui/generated/`。
+- 手写业务 UI 适配层函数改为 `s3_ui_init()`、`s3_ui_update()`、`s3_ui_set_touch()`，避免和 SquareLine 生成的 `ui_init()` 冲突。
+- `s3_ui_init()` 先调用 SquareLine 生成的 `ui_init()`，再叠加当前遥控器状态、触摸点和 FPS 显示。
+- 新增 `tools/platformio/patch_squareline_export.py`，在 `s3_transmitter` 编译前自动屏蔽 SquareLine 生成文件中与实机颜色配置冲突的 `LV_COLOR_16_SWAP == 0` 检查。
+- 新增 `docs/ui-workflow.md` 记录导出和集成流程。
+
+### 验证
+
+- `pio test -e native`：PASS，16/16。
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+- COM7 启动日志确认正式 S3 程序启动，I2C 扫描到 `0x0D`、`0x62`、`0x76`，连接状态为 `[OK]`。
+
+### 后续规则
+
+- 不手动修改 `src/transmitter_s3/ui/generated/` 中的业务逻辑。
+- 重新导出后先运行 `pio run -e s3_transmitter`，自动补丁会处理当前已知的 SquareLine 颜色检查冲突。
+- 需要持久使用的控件名称应在 SquareLine 中命名清楚，再由 `s3_ui_update()` 引用。

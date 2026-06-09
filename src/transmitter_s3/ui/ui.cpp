@@ -1,5 +1,6 @@
 #include "ui.h"
 
+#include "generated/ui.h"
 #include <lvgl.h>
 
 namespace {
@@ -29,7 +30,9 @@ lv_obj_t *createDashboardLabel(int16_t x, int16_t y, lv_color_t color) {
 
 }  // namespace
 
-void ui_init() {
+void s3_ui_init() {
+  ui_init();
+
   lv_obj_t *screen = lv_scr_act();
   lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_style_bg_color(screen, lv_color_black(), 0);
@@ -85,7 +88,7 @@ void ui_init() {
   lv_obj_align(placeholderLabel, LV_ALIGN_BOTTOM_MID, 0, -12);
 }
 
-void ui_update(const S3UiState &state) {
+void s3_ui_update(const S3UiState &state) {
   char buffer[48] = {};
 
   lv_obj_set_style_text_color(statusLabel, state.connected ? lv_color_hex(0x00FF66) : lv_color_hex(0xFF4040), 0);
@@ -136,7 +139,7 @@ void ui_update(const S3UiState &state) {
   lv_label_set_text(fpsLabel, buffer);
 }
 
-void ui_set_touch(bool pressed, int16_t x, int16_t y) {
+void s3_ui_set_touch(bool pressed, int16_t x, int16_t y) {
   char buffer[24] = {};
   if (!pressed) {
     lv_label_set_text(touchLabel, "TOUCH --");

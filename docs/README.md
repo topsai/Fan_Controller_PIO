@@ -16,6 +16,7 @@
 | `test-runs/` | 实际测试执行记录 |
 | `unit-test-plan.md` | 后续可自动化测试的设计和用例清单 |
 | `workflow.md` | 每次代码更新、测试、上传固件、文档和 GitHub 推送流程 |
+| `ui-workflow.md` | S3 SquareLine Studio 工程、导出目录、生成代码和适配层边界 |
 | `progress.md` | 项目推进记录 |
 | `bugs.md` | bug/风险/维护项跟踪 |
 | `decisions.md` | 已确认设计决策和依据 |

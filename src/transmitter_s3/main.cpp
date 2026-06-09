@@ -528,11 +528,11 @@ void lvTouchReadCallback(lv_indev_drv_t *, lv_indev_data_t *data) {
     data->state = LV_INDEV_STATE_PRESSED;
     data->point.x = x;
     data->point.y = y;
-    ui_set_touch(true, x, y);
+    s3_ui_set_touch(true, x, y);
     return;
   }
   data->state = LV_INDEV_STATE_RELEASED;
-  ui_set_touch(false, 0, 0);
+  s3_ui_set_touch(false, 0, 0);
 }
 
 void setupLvgl() {
@@ -551,7 +551,7 @@ void setupLvgl() {
   lvTouchDriver.read_cb = lvTouchReadCallback;
   lv_indev_drv_register(&lvTouchDriver);
 
-  ui_init();
+  s3_ui_init();
   lastLvTickMs = millis();
   lastLvglHandlerMs = lastLvTickMs;
 }
@@ -666,7 +666,7 @@ void updateDashboard() {
   state.qmcValid = qmc.valid;
   state.qmcHeadingDeg = qmc.headingDeg;
   state.displayFps = displayFps;
-  ui_update(state);
+  s3_ui_update(state);
 }
 
 }  // namespace
