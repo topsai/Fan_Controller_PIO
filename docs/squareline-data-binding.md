@@ -23,11 +23,13 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 | --- | --- | --- | --- | --- |
 | 电池电量百分比 | Arc | `ui_ArcBattery` | `S3UiState::cw2015Soc` | `lv_arc_set_value()` |
 | 电池电量文字 | Label | `ui_LabelBattery` | `cw2015Valid/cw2015Voltage/cw2015Soc` | `lv_label_set_text()` |
-| 连接状态/VESC 电压 | Label | `ui_LabelStatus` | `connected/receiverVoltageX100` | `lv_label_set_text()` + `lv_obj_set_style_text_color()` |
-| 档位和油门 | Label | `ui_LabelControl` | `speedLevel/joystickValue` | `lv_label_set_text()` |
-| 油门/刹车进度 | Bar 或 Arc | `ui_BarThrottle` | `joystickValue` | `lv_bar_set_value()` |
+| 连接状态 | Label | `ui_LabelStatus` | `connected` | `lv_label_set_text()` + `lv_obj_set_style_text_color()` |
+| VESC 电压文字 | Label | `ui_LabelStatusVoltage` | `connected/receiverVoltageX100` | `lv_label_set_text()` |
+| VESC 电压进度 | Arc | `ui_ArcStatusVoltage` | `connected/receiverVoltageX100` | `lv_arc_set_value()` |
+| 当前档位 | Label | `ui_LabelControl` | `speedLevel` | `lv_label_set_text()` |
+| 油门/刹车进度 | Bar | `ui_BarThrottle` | `joystickValue` | `lv_bar_set_value()` + `lv_obj_set_style_bg_color()` |
 | 轮速 | Label | `ui_LabelSpeed` | `receiverSpeed` | `lv_label_set_text()` + `lv_obj_set_style_text_color()` |
-| BMP280 | Label | `ui_LabelBmp280` | `bmp280Valid/bmp280TemperatureC/bmp280PressureHpa` | `lv_label_set_text()` |
+| BMP280 | Label | `ui_LabelBmp280` | `bmp280Valid/bmp280PressureHpa/bmp280AltitudeM` | `lv_label_set_text()` |
 | QMC5883L 航向 | Label | `ui_LabelHeading` | `qmcValid/qmcHeadingDeg` | `lv_label_set_text()` |
 | 按钮/RSSI | Label | `ui_LabelButtons` | `buttonState/rssiValue` | `lv_label_set_text()` |
 | FPS | Label | `ui_LabelFps` | `displayFps` | `lv_label_set_text()` |
@@ -38,7 +40,15 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 
 当前 SquareLine 导出的速度 Label 实例名是 `ui_LabelSpeed`。速度颜色规则在 `include/s3_ui_bindings.h` 的 `s3SpeedColorHex()` 中维护：低于 15 km/h 为绿色，15-29 km/h 为黄色，30 km/h 及以上为红色。
 
-当前 SquareLine 导出的状态 Label 实例名是 `ui_LabelStatus`。连接时显示 `OK xx.xxV` 并使用绿色；断联时显示 `LOST` 并使用红色。
+当前 SquareLine 导出的状态 Label 实例名是 `ui_LabelStatus`。连接时显示 `OK` 并使用绿色；断联时显示 `LOST` 并使用红色。VESC 电压由独立的 `ui_LabelStatusVoltage` 显示。
+
+当前 SquareLine 导出的档位 Label 实例名是 `ui_LabelControl`，显示格式为 `SPD n`。
+
+当前 SquareLine 导出的油门/刹车 Bar 实例名是 `ui_BarThrottle`。代码侧会强制设置范围为 `-1000` 到 `1000`，模式为 `LV_BAR_MODE_SYMMETRICAL`，因此摇杆回中时 Bar 保持在中位；油门为正值向右增长并使用绿色，刹车为负值向左增长并使用橙色，回中时使用灰色。
+
+当前 SquareLine 导出的 VESC 电压控件是 `ui_ArcStatusVoltage` 和 `ui_LabelStatusVoltage`。Arc 范围固定为 `6-48V`，代码会把 `receiverVoltageX100` 四舍五入到整数伏并限制在该范围内；断联时 Arc 回到 `6V`，文字显示 `--.-V`。
+
+当前 SquareLine 导出的 BMP280 Label 实例名是 `ui_LabelBmp280`，显示格式为 `气压hPa 海拔m`。海拔由标准海平面气压 `1013.25hPa` 估算，只适合显示趋势，不等同于精密校准海拔。
 
 ## 电池 Arc 设置
 

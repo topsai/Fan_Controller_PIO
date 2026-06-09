@@ -839,3 +839,34 @@ SquareLine 重新导出后，电池 Arc 的实际实例名是 `ui_uiArcBattery`�
 - `pio run -e transmitter`：SUCCESS。
 - `pio run -e receiver`：SUCCESS。
 - `git diff --check`：PASS，仅有 CRLF 换行提示。
+
+## 2026-06-09 S3 控制/BMP280/VESC 电压控件绑定
+
+### 目标
+
+接入 SquareLine 中新增的 `ui_LabelControl`、`ui_LabelBmp280`、`ui_BarThrottle`、`ui_LabelStatusVoltage`、`ui_ArcStatusVoltage`。
+
+### 已修改
+
+- `ui_LabelControl` 显示当前档位，格式为 `SPD n`。
+- `ui_BarThrottle` 设置为 `-1000` 到 `1000` 的对称 Bar，摇杆回中时保持在中位。
+- 油门正值向右增长并显示绿色，刹车负值向左增长并显示橙色，回中显示灰色。
+- `ui_ArcStatusVoltage` 显示 VESC 电压，范围固定为 `6-48V`；断联时回到最低值。
+- `ui_LabelStatusVoltage` 连接时显示 `xx.xxV`，断联时显示 `--.-V`。
+- `ui_LabelBmp280` 显示气压和估算海拔，格式为 `xxxxhPa xxxm`。
+- `S3UiState` 新增 `bmp280AltitudeM`，正式 S3 主程序读取 BMP280 后计算海拔并传入 UI。
+- `include/s3_ui_bindings.h` 新增 VESC 电压、油门 Bar、油门颜色和 BMP280 海拔的映射函数。
+- 更新 `docs/squareline-data-binding.md` 中的新增控件绑定说明。
+
+### 验证
+
+- 新增 native 单测：
+  - `test_s3_voltage_arc_value_clamps_to_vesc_display_range`
+  - `test_s3_throttle_bar_keeps_center_and_uses_direction_colors`
+  - `test_s3_bmp280_altitude_uses_standard_sea_level_pressure`
+- `pio test -e native`：PASS，21/21。
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e receiver`：SUCCESS。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+- `git diff --check`：PASS，仅有 CRLF 换行提示。

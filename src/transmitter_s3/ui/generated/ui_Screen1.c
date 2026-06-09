@@ -10,8 +10,13 @@ lv_obj_t * ui_bg_1 = NULL;
 lv_obj_t * ui_ArcBattery = NULL;
 lv_obj_t * ui_LabelBattery = NULL;
 lv_obj_t * ui_LabelSpeed = NULL;
-lv_obj_t * ui_Label2 = NULL;
+lv_obj_t * ui_kmh = NULL;
 lv_obj_t * ui_LabelStatus = NULL;
+lv_obj_t * ui_LabelControl = NULL;
+lv_obj_t * ui_LabelBmp280 = NULL;
+lv_obj_t * ui_BarThrottle = NULL;
+lv_obj_t * ui_ArcStatusVoltage = NULL;
+lv_obj_t * ui_LabelStatusVoltage = NULL;
 // event funtions
 
 // build funtions
@@ -32,19 +37,26 @@ void ui_Screen1_screen_init(void)
     ui_ArcBattery = lv_arc_create(ui_Screen1);
     lv_obj_set_width(ui_ArcBattery, lv_pct(99));
     lv_obj_set_height(ui_ArcBattery, lv_pct(99));
+    lv_obj_set_x(ui_ArcBattery, 0);
+    lv_obj_set_y(ui_ArcBattery, 2);
     lv_obj_set_align(ui_ArcBattery, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_ArcBattery, LV_OBJ_FLAG_ADV_HITTEST);     /// Flags
-    lv_arc_set_value(ui_ArcBattery, 50);
+    lv_arc_set_value(ui_ArcBattery, 9);
     lv_arc_set_bg_angles(ui_ArcBattery, 120, 240);
+    lv_arc_set_rotation(ui_ArcBattery, 9);
+
+    lv_obj_set_style_arc_color(ui_ArcBattery, lv_color_hex(0x4DFF40), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    lv_obj_set_style_arc_opa(ui_ArcBattery, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
     lv_obj_set_style_opa(ui_ArcBattery, 0, LV_PART_KNOB | LV_STATE_DEFAULT);
 
     ui_LabelBattery = lv_label_create(ui_Screen1);
     lv_obj_set_width(ui_LabelBattery, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_LabelBattery, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_LabelBattery, -22);
-    lv_obj_set_y(ui_LabelBattery, 101);
+    lv_obj_set_x(ui_LabelBattery, -37);
+    lv_obj_set_y(ui_LabelBattery, 95);
     lv_obj_set_align(ui_LabelBattery, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_LabelBattery, "0%");
     lv_obj_set_style_text_color(ui_LabelBattery, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_LabelBattery, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_LabelBattery, &ui_font_Subtitle, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -60,21 +72,71 @@ void ui_Screen1_screen_init(void)
     lv_obj_set_style_text_opa(ui_LabelSpeed, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_LabelSpeed, &ui_font_Number_big, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    ui_Label2 = lv_label_create(ui_Screen1);
-    lv_obj_set_width(ui_Label2, LV_SIZE_CONTENT);   /// 1
-    lv_obj_set_height(ui_Label2, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_Label2, 76);
-    lv_obj_set_y(ui_Label2, 35);
-    lv_obj_set_align(ui_Label2, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_Label2, "Km");
+    ui_kmh = lv_label_create(ui_Screen1);
+    lv_obj_set_width(ui_kmh, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_kmh, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_kmh, 77);
+    lv_obj_set_y(ui_kmh, 39);
+    lv_obj_set_align(ui_kmh, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_kmh, "Km");
 
     ui_LabelStatus = lv_label_create(ui_Screen1);
     lv_obj_set_width(ui_LabelStatus, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_LabelStatus, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_LabelStatus, -3);
-    lv_obj_set_y(ui_LabelStatus, -93);
+    lv_obj_set_x(ui_LabelStatus, -1);
+    lv_obj_set_y(ui_LabelStatus, -108);
     lv_obj_set_align(ui_LabelStatus, LV_ALIGN_CENTER);
     lv_label_set_text(ui_LabelStatus, "N/A");
+
+    ui_LabelControl = lv_label_create(ui_Screen1);
+    lv_obj_set_width(ui_LabelControl, lv_pct(21));
+    lv_obj_set_height(ui_LabelControl, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_LabelControl, -71);
+    lv_obj_set_y(ui_LabelControl, 37);
+    lv_obj_set_align(ui_LabelControl, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_LabelControl, "0");
+    lv_obj_set_style_text_align(ui_LabelControl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_LabelControl, &ui_font_Subtitle, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(ui_LabelControl, 50, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(ui_LabelControl, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(ui_LabelControl, 50, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    ui_LabelBmp280 = lv_label_create(ui_Screen1);
+    lv_obj_set_width(ui_LabelBmp280, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_LabelBmp280, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_LabelBmp280, -3);
+    lv_obj_set_y(ui_LabelBmp280, -67);
+    lv_obj_set_align(ui_LabelBmp280, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_LabelBmp280, "0");
+
+    ui_BarThrottle = lv_bar_create(ui_Screen1);
+    lv_obj_set_width(ui_BarThrottle, 150);
+    lv_obj_set_height(ui_BarThrottle, 10);
+    lv_obj_set_x(ui_BarThrottle, 1);
+    lv_obj_set_y(ui_BarThrottle, 58);
+    lv_obj_set_align(ui_BarThrottle, LV_ALIGN_CENTER);
+
+    ui_ArcStatusVoltage = lv_arc_create(ui_Screen1);
+    lv_obj_set_width(ui_ArcStatusVoltage, lv_pct(99));
+    lv_obj_set_height(ui_ArcStatusVoltage, lv_pct(99));
+    lv_obj_set_align(ui_ArcStatusVoltage, LV_ALIGN_CENTER);
+    lv_arc_set_range(ui_ArcStatusVoltage, 6, 48);
+    lv_arc_set_value(ui_ArcStatusVoltage, 10);
+    lv_arc_set_bg_angles(ui_ArcStatusVoltage, 290, 50);
+    lv_arc_set_mode(ui_ArcStatusVoltage, LV_ARC_MODE_REVERSE);
+
+    lv_obj_set_style_opa(ui_ArcStatusVoltage, 0, LV_PART_KNOB | LV_STATE_DEFAULT);
+
+    ui_LabelStatusVoltage = lv_label_create(ui_Screen1);
+    lv_obj_set_width(ui_LabelStatusVoltage, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_LabelStatusVoltage, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_LabelStatusVoltage, 36);
+    lv_obj_set_y(ui_LabelStatusVoltage, 97);
+    lv_obj_set_align(ui_LabelStatusVoltage, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_LabelStatusVoltage, "0V");
+    lv_obj_set_style_text_color(ui_LabelStatusVoltage, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui_LabelStatusVoltage, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_LabelStatusVoltage, &ui_font_Subtitle, LV_PART_MAIN | LV_STATE_DEFAULT);
 
 }
 
@@ -88,7 +150,12 @@ void ui_Screen1_screen_destroy(void)
     ui_ArcBattery = NULL;
     ui_LabelBattery = NULL;
     ui_LabelSpeed = NULL;
-    ui_Label2 = NULL;
+    ui_kmh = NULL;
     ui_LabelStatus = NULL;
+    ui_LabelControl = NULL;
+    ui_LabelBmp280 = NULL;
+    ui_BarThrottle = NULL;
+    ui_ArcStatusVoltage = NULL;
+    ui_LabelStatusVoltage = NULL;
 
 }

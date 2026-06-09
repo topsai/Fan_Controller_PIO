@@ -169,6 +169,29 @@ void test_s3_speed_label_color_uses_speed_bands() {
   TEST_ASSERT_EQUAL_UINT32(0xFF4040, s3SpeedColorHex(30));
 }
 
+void test_s3_voltage_arc_value_clamps_to_vesc_display_range() {
+  TEST_ASSERT_EQUAL_INT16(6, s3StatusVoltageForArc(false, 4800));
+  TEST_ASSERT_EQUAL_INT16(6, s3StatusVoltageForArc(true, 0));
+  TEST_ASSERT_EQUAL_INT16(6, s3StatusVoltageForArc(true, 599));
+  TEST_ASSERT_EQUAL_INT16(36, s3StatusVoltageForArc(true, 3560));
+  TEST_ASSERT_EQUAL_INT16(48, s3StatusVoltageForArc(true, 5200));
+}
+
+void test_s3_throttle_bar_keeps_center_and_uses_direction_colors() {
+  TEST_ASSERT_EQUAL_INT16(-1000, s3ThrottleBarValue(-1500));
+  TEST_ASSERT_EQUAL_INT16(0, s3ThrottleBarValue(0));
+  TEST_ASSERT_EQUAL_INT16(1000, s3ThrottleBarValue(1500));
+  TEST_ASSERT_EQUAL_UINT32(0x00C853, s3ThrottleColorHex(500));
+  TEST_ASSERT_EQUAL_UINT32(0xFF9800, s3ThrottleColorHex(-500));
+  TEST_ASSERT_EQUAL_UINT32(0x606060, s3ThrottleColorHex(0));
+}
+
+void test_s3_bmp280_altitude_uses_standard_sea_level_pressure() {
+  TEST_ASSERT_FLOAT_WITHIN(0.1f, 0.0f, s3Bmp280AltitudeMeters(1013.25f));
+  TEST_ASSERT_FLOAT_WITHIN(1.0f, 110.9f, s3Bmp280AltitudeMeters(1000.0f));
+  TEST_ASSERT_TRUE(isnan(s3Bmp280AltitudeMeters(NAN)));
+}
+
 void setup() {
   UNITY_BEGIN();
   RUN_TEST(test_pwm_mapping_uses_vesc_servo_range);
@@ -189,6 +212,9 @@ void setup() {
   RUN_TEST(test_receiver_status_target_tracks_last_valid_transmitter);
   RUN_TEST(test_s3_battery_arc_value_clamps_and_rounds_soc);
   RUN_TEST(test_s3_speed_label_color_uses_speed_bands);
+  RUN_TEST(test_s3_voltage_arc_value_clamps_to_vesc_display_range);
+  RUN_TEST(test_s3_throttle_bar_keeps_center_and_uses_direction_colors);
+  RUN_TEST(test_s3_bmp280_altitude_uses_standard_sea_level_pressure);
   UNITY_END();
 }
 

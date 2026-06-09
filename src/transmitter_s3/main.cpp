@@ -9,6 +9,7 @@
 #include "beep_profiles.h"
 #include "control_logic.h"
 #include "s3_runtime_config.h"
+#include "s3_ui_bindings.h"
 #include "ui/ui.h"
 
 namespace {
@@ -183,6 +184,7 @@ struct Bmp280Data {
   uint8_t addr = 0;
   float temperatureC = NAN;
   float pressureHpa = NAN;
+  float altitudeM = NAN;
   Bmp280Cal cal;
 };
 
@@ -400,6 +402,7 @@ void readBmp280() {
   const int32_t adcT = ((int32_t)data[3] << 12) | ((int32_t)data[4] << 4) | (data[5] >> 4);
   bmp280.temperatureC = compensateBmp280Temperature(bmp280.cal, adcT);
   bmp280.pressureHpa = compensateBmp280Pressure(bmp280.cal, adcP);
+  bmp280.altitudeM = s3Bmp280AltitudeMeters(bmp280.pressureHpa);
   bmp280.valid = !isnan(bmp280.pressureHpa);
 }
 
@@ -663,6 +666,7 @@ void updateDashboard() {
   state.bmp280Valid = bmp280.valid;
   state.bmp280TemperatureC = bmp280.temperatureC;
   state.bmp280PressureHpa = bmp280.pressureHpa;
+  state.bmp280AltitudeM = bmp280.altitudeM;
   state.qmcValid = qmc.valid;
   state.qmcHeadingDeg = qmc.headingDeg;
   state.displayFps = displayFps;

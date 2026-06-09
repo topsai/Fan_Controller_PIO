@@ -45,6 +45,26 @@ lv_obj_t *statusValueLabel() {
   return ui_LabelStatus;
 }
 
+lv_obj_t *controlValueLabel() {
+  return ui_LabelControl;
+}
+
+lv_obj_t *bmp280ValueLabel() {
+  return ui_LabelBmp280;
+}
+
+lv_obj_t *throttleValueBar() {
+  return ui_BarThrottle;
+}
+
+lv_obj_t *statusVoltageArc() {
+  return ui_ArcStatusVoltage;
+}
+
+lv_obj_t *statusVoltageLabel() {
+  return ui_LabelStatusVoltage;
+}
+
 }  // namespace
 
 void s3_ui_init() {
@@ -123,15 +143,43 @@ void s3_ui_init() {
     lv_label_set_text(statusValueLabel(), "LOST");
     lv_obj_set_style_text_color(statusValueLabel(), lv_color_hex(0xFF4040), LV_PART_MAIN);
   }
+
+  if (controlValueLabel() != nullptr) {
+    lv_label_set_text(controlValueLabel(), "SPD 1");
+  }
+
+  if (bmp280ValueLabel() != nullptr) {
+    lv_label_set_text(bmp280ValueLabel(), "BMP N/A");
+  }
+
+  if (throttleValueBar() != nullptr) {
+    lv_bar_set_range(throttleValueBar(), -1000, 1000);
+    lv_bar_set_mode(throttleValueBar(), LV_BAR_MODE_SYMMETRICAL);
+    lv_bar_set_value(throttleValueBar(), 0, LV_ANIM_OFF);
+    lv_obj_set_style_bg_color(throttleValueBar(), lv_color_hex(0x303030), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(throttleValueBar(), lv_color_hex(s3ThrottleColorHex(0)), LV_PART_INDICATOR);
+  }
+
+  if (statusVoltageArc() != nullptr) {
+    lv_arc_set_range(statusVoltageArc(), 6, 48);
+    lv_arc_set_value(statusVoltageArc(), 6);
+    lv_obj_clear_flag(statusVoltageArc(), LV_OBJ_FLAG_CLICKABLE);
+  }
+
+  if (statusVoltageLabel() != nullptr) {
+    lv_label_set_text(statusVoltageLabel(), "--.-V");
+  }
 }
 
 void s3_ui_update(const S3UiState &state) {
-  char buffer[48] = {};
+  char buffer[64] = {};
   const int16_t batteryPercent = s3BatteryPercentForArc(state.cw2015Valid, state.cw2015Soc);
+  const int16_t throttleBarValue = s3ThrottleBarValue(state.joystickValue);
+  const int16_t statusVoltageValue = s3StatusVoltageForArc(state.connected, state.receiverVoltageX100);
 
   lv_obj_set_style_text_color(statusLabel, state.connected ? lv_color_hex(0x00FF66) : lv_color_hex(0xFF4040), 0);
   if (state.connected) {
-    snprintf(buffer, sizeof(buffer), "OK  VESC %.2fV", state.receiverVoltageX100 / 100.0f);
+    snprintf(buffer, sizeof(buffer), "OK");
   } else {
     snprintf(buffer, sizeof(buffer), "LOST");
   }
@@ -145,6 +193,10 @@ void s3_ui_update(const S3UiState &state) {
 
   snprintf(buffer, sizeof(buffer), "SPD %u  THR %d", state.speedLevel, state.joystickValue);
   lv_label_set_text(controlLabel, buffer);
+  if (controlValueLabel() != nullptr) {
+    snprintf(buffer, sizeof(buffer), "SPD %u", state.speedLevel);
+    lv_label_set_text(controlValueLabel(), buffer);
+  }
 
   snprintf(buffer, sizeof(buffer), "SPEED %u KM", state.receiverSpeed);
   lv_label_set_text(speedLabel, buffer);
@@ -178,6 +230,14 @@ void s3_ui_update(const S3UiState &state) {
     snprintf(buffer, sizeof(buffer), "BMP N/A");
   }
   lv_label_set_text(bmpLabel, buffer);
+  if (bmp280ValueLabel() != nullptr) {
+    if (state.bmp280Valid) {
+      snprintf(buffer, sizeof(buffer), "%.0fhPa %.0fm", state.bmp280PressureHpa, state.bmp280AltitudeM);
+    } else {
+      snprintf(buffer, sizeof(buffer), "BMP N/A");
+    }
+    lv_label_set_text(bmp280ValueLabel(), buffer);
+  }
 
   if (state.qmcValid) {
     snprintf(buffer, sizeof(buffer), "HDG %.0fdeg", state.qmcHeadingDeg);
@@ -191,9 +251,29 @@ void s3_ui_update(const S3UiState &state) {
 
   lv_label_set_text(barLabel, state.joystickValue >= 0 ? "THR" : "BRK");
   lv_obj_set_style_bg_color(throttleBar,
-                            state.joystickValue >= 0 ? lv_color_hex(0x00C853) : lv_color_hex(0xFF9800),
+                            lv_color_hex(s3ThrottleColorHex(state.joystickValue)),
                             LV_PART_INDICATOR);
-  lv_bar_set_value(throttleBar, state.joystickValue, LV_ANIM_OFF);
+  lv_bar_set_value(throttleBar, throttleBarValue, LV_ANIM_OFF);
+  if (throttleValueBar() != nullptr) {
+    lv_obj_set_style_bg_color(throttleValueBar(), lv_color_hex(s3ThrottleColorHex(state.joystickValue)),
+                              LV_PART_INDICATOR);
+    lv_bar_set_value(throttleValueBar(), throttleBarValue, LV_ANIM_OFF);
+  }
+
+  if (statusVoltageArc() != nullptr) {
+    lv_arc_set_value(statusVoltageArc(), statusVoltageValue);
+    lv_obj_set_style_arc_color(statusVoltageArc(),
+                               state.connected ? lv_color_hex(0x00D86A) : lv_color_hex(0x606060),
+                               LV_PART_INDICATOR);
+  }
+  if (statusVoltageLabel() != nullptr) {
+    if (state.connected) {
+      snprintf(buffer, sizeof(buffer), "%.2fV", state.receiverVoltageX100 / 100.0f);
+    } else {
+      snprintf(buffer, sizeof(buffer), "--.-V");
+    }
+    lv_label_set_text(statusVoltageLabel(), buffer);
+  }
 
   snprintf(buffer, sizeof(buffer), "FPS %u", state.displayFps);
   lv_label_set_text(fpsLabel, buffer);
