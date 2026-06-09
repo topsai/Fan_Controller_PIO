@@ -34,7 +34,7 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 | 触摸坐标 | Label | `ui_LabelTouch` | touch callback | `lv_label_set_text()` |
 | 触摸点 | Object | `ui_DotTouch` | touch callback | `lv_obj_set_pos()` |
 
-当前已导出的电池 Arc 对象名是 `ui_BAT`，代码已按这个名称绑定。后续建议在 SquareLine 中把实例名改为更清晰的 `ui_ArcBattery`。
+当前 SquareLine 导出的电池 Arc 实例名是 `ui_uiArcBattery`，电量文字是 `ui_uiLabelBattery`，代码已按这两个实际名称绑定。推荐名仍然是 `ui_ArcBattery` / `ui_LabelBattery`，但最终以 `src/transmitter_s3/ui/generated/ui_Screen1.h` 中的 `extern lv_obj_t * ...` 声明为准。
 
 ## 电池 Arc 设置
 
@@ -55,5 +55,5 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 - `src/transmitter_s3/ui/generated/ui.h` 应包含对应对象的声明。
 - `src/transmitter_s3/ui/generated/ui_Screen1.c` 应创建对应对象。
 - 如果对象名称改变，需要同步修改 `src/transmitter_s3/ui/ui.cpp` 的绑定代码。
+- 若编译报 `was not declared in this scope`，优先检查 `ui.cpp` 引用的控件名是否和 `ui_Screen1.h` 中的实际导出名一致。
 - 导出后先运行 `pio run -e s3_transmitter`。构建脚本会自动修复 SquareLine 颜色检查和 true color 图片字节序。
-

@@ -774,3 +774,25 @@ SquareLine Studio 预览中背景图为深色，但实机显示为粉色/绿色�
 - `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
 - `pio run -e transmitter`：SUCCESS。
 - `pio run -e receiver`：SUCCESS。
+
+## 2026-06-09 S3 SquareLine 控件名编译错误修复
+
+### 现象
+
+`pio run -e s3_transmitter` 编译失败，`src/transmitter_s3/ui/ui.cpp` 报 `ui_ArcBattery was not declared in this scope`。
+
+### 原因
+
+SquareLine 重新导出后，电池 Arc 的实际实例名是 `ui_uiArcBattery`，电量文字 Label 是 `ui_uiLabelBattery`；而手写绑定层引用了推荐名 `ui_ArcBattery`。
+
+### 已修改
+
+- `src/transmitter_s3/ui/ui.cpp` 改为绑定实际导出的 `ui_uiArcBattery`。
+- 同步绑定 `ui_uiLabelBattery`，显示电量百分比或 `--%`。
+- 更新 `docs/squareline-data-binding.md`，说明编译错误时以 `ui_Screen1.h` 中的实际对象名为准。
+
+### 验证
+
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio test -e native`：PASS，17/17。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。

@@ -29,6 +29,14 @@ lv_obj_t *createDashboardLabel(int16_t x, int16_t y, lv_color_t color) {
   return label;
 }
 
+lv_obj_t *batteryArc() {
+  return ui_uiArcBattery;
+}
+
+lv_obj_t *batteryValueLabel() {
+  return ui_uiLabelBattery;
+}
+
 }  // namespace
 
 void s3_ui_init() {
@@ -88,10 +96,14 @@ void s3_ui_init() {
   lv_label_set_text(placeholderLabel, "pins are placeholders");
   lv_obj_align(placeholderLabel, LV_ALIGN_BOTTOM_MID, 0, -12);
 
-  if (ui_BAT != nullptr) {
-    lv_arc_set_range(ui_BAT, 0, 100);
-    lv_arc_set_value(ui_BAT, 0);
-    lv_obj_clear_flag(ui_BAT, LV_OBJ_FLAG_CLICKABLE);
+  if (batteryArc() != nullptr) {
+    lv_arc_set_range(batteryArc(), 0, 100);
+    lv_arc_set_value(batteryArc(), 0);
+    lv_obj_clear_flag(batteryArc(), LV_OBJ_FLAG_CLICKABLE);
+  }
+
+  if (batteryValueLabel() != nullptr) {
+    lv_label_set_text(batteryValueLabel(), "--%");
   }
 }
 
@@ -120,11 +132,15 @@ void s3_ui_update(const S3UiState &state) {
   }
   lv_label_set_text(batteryLabel, buffer);
 
-  if (ui_BAT != nullptr) {
-    lv_arc_set_value(ui_BAT, batteryPercent);
-    lv_obj_set_style_arc_color(ui_BAT,
+  if (batteryArc() != nullptr) {
+    lv_arc_set_value(batteryArc(), batteryPercent);
+    lv_obj_set_style_arc_color(batteryArc(),
                                batteryPercent <= 20 ? lv_color_hex(0xFF4040) : lv_color_hex(0x00D86A),
                                LV_PART_INDICATOR);
+  }
+  if (batteryValueLabel() != nullptr) {
+    snprintf(buffer, sizeof(buffer), state.cw2015Valid ? "%d%%" : "--%%", batteryPercent);
+    lv_label_set_text(batteryValueLabel(), buffer);
   }
 
   if (state.bmp280Valid) {

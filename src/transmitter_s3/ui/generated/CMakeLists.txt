@@ -4,6 +4,11 @@ SET(SOURCES ui_comp_uiarcbattery.c
     ui.c
     ui_comp_hook.c
     ui_helpers.c
-    ui_img_bg3_png.c)
+    ui_img_bg3_png.c
+    fonts/ui_font_H1.c
+    fonts/ui_font_Number_big.c
+    fonts/ui_font_Number_extra.c
+    fonts/ui_font_Subtitle.c
+    fonts/ui_font_Title.c)
 
 add_library(ui ${SOURCES})

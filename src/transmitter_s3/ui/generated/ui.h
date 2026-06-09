@@ -41,6 +41,13 @@ extern lv_obj_t * ui____initial_actions0;
 // IMAGES AND IMAGE SETS
 LV_IMG_DECLARE(ui_img_bg3_png);    // assets/bg3.png
 
+// FONTS
+LV_FONT_DECLARE(ui_font_H1);
+LV_FONT_DECLARE(ui_font_Number_big);
+LV_FONT_DECLARE(ui_font_Number_extra);
+LV_FONT_DECLARE(ui_font_Subtitle);
+LV_FONT_DECLARE(ui_font_Title);
+
 // UI INIT
 void ui_init(void);
 void ui_destroy(void);

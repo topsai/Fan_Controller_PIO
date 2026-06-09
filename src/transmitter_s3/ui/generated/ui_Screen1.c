@@ -7,7 +7,8 @@
 
 lv_obj_t * ui_Screen1 = NULL;
 lv_obj_t * ui_bg_1 = NULL;
-lv_obj_t * ui_BAT = NULL;
+lv_obj_t * ui_uiArcBattery = NULL;
+lv_obj_t * ui_uiLabelBattery = NULL;
 // event funtions
 
 // build funtions
@@ -25,10 +26,25 @@ void ui_Screen1_screen_init(void)
     lv_obj_add_flag(ui_bg_1, LV_OBJ_FLAG_ADV_HITTEST);     /// Flags
     lv_obj_clear_flag(ui_bg_1, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
-    ui_BAT = ui_uiArcBattery_create(ui_Screen1);
-    lv_obj_set_x(ui_BAT, 0);
-    lv_obj_set_y(ui_BAT, 0);
-    lv_arc_set_bg_angles(ui_BAT, 99, 260);
+    ui_uiArcBattery = lv_arc_create(ui_Screen1);
+    lv_obj_set_width(ui_uiArcBattery, lv_pct(99));
+    lv_obj_set_height(ui_uiArcBattery, lv_pct(99));
+    lv_obj_set_align(ui_uiArcBattery, LV_ALIGN_CENTER);
+    lv_obj_add_flag(ui_uiArcBattery, LV_OBJ_FLAG_ADV_HITTEST);     /// Flags
+    lv_arc_set_value(ui_uiArcBattery, 50);
+    lv_arc_set_bg_angles(ui_uiArcBattery, 120, 240);
+
+    lv_obj_set_style_opa(ui_uiArcBattery, 0, LV_PART_KNOB | LV_STATE_DEFAULT);
+
+    ui_uiLabelBattery = lv_label_create(ui_Screen1);
+    lv_obj_set_width(ui_uiLabelBattery, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_uiLabelBattery, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_uiLabelBattery, -22);
+    lv_obj_set_y(ui_uiLabelBattery, 101);
+    lv_obj_set_align(ui_uiLabelBattery, LV_ALIGN_CENTER);
+    lv_obj_set_style_text_color(ui_uiLabelBattery, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui_uiLabelBattery, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_uiLabelBattery, &ui_font_Subtitle, LV_PART_MAIN | LV_STATE_DEFAULT);
 
 }
 
@@ -39,6 +55,7 @@ void ui_Screen1_screen_destroy(void)
     // NULL screen variables
     ui_Screen1 = NULL;
     ui_bg_1 = NULL;
-    ui_BAT = NULL;
+    ui_uiArcBattery = NULL;
+    ui_uiLabelBattery = NULL;
 
 }
