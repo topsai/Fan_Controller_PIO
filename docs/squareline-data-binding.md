@@ -48,7 +48,7 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 
 当前 SquareLine 导出的 VESC 电压控件是 `ui_ArcStatusVoltage` 和 `ui_LabelStatusVoltage`。Arc 范围固定为 `6-48V`，代码会把 `receiverVoltageX100` 四舍五入到整数伏并限制在该范围内；断联时 Arc 回到 `6V`，文字显示 `--.-V`。
 
-当前 SquareLine 导出的 BMP280 Label 实例名是 `ui_LabelBmp280`，显示格式为 `气压hPa 海拔m`。海拔由标准海平面气压 `1013.25hPa` 估算，只适合显示趋势，不等同于精密校准海拔。
+当前 SquareLine 导出的 BMP280 Label 实例名是 `ui_LabelBmp280`，显示格式为两行：第一行 `气压hPa`，第二行 `海拔m`。代码侧会强制设置白色、12px 字体和居中对齐，避免旧手写参数层删除后出现文字看不清或过长挤压。海拔由标准海平面气压 `1013.25hPa` 估算，只适合显示趋势，不等同于精密校准海拔。
 
 旧版手写叠加参数层已经删除，包括标题、连接状态、档位/油门、速度、电池、BMP280、航向、按钮/RSSI、FPS、触摸坐标和占位 GPIO 提示。后续新增显示内容应优先在 SquareLine 创建控件，再在 `src/transmitter_s3/ui/ui.cpp` 里绑定数据。
 

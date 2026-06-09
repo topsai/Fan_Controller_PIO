@@ -89,7 +89,7 @@ void ui_Screen1_screen_init(void)
     lv_label_set_text(ui_LabelStatus, "N/A");
 
     ui_LabelControl = lv_label_create(ui_Screen1);
-    lv_obj_set_width(ui_LabelControl, lv_pct(21));
+    lv_obj_set_width(ui_LabelControl, lv_pct(14));
     lv_obj_set_height(ui_LabelControl, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_LabelControl, -71);
     lv_obj_set_y(ui_LabelControl, 37);

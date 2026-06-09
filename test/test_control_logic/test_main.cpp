@@ -37,15 +37,35 @@ void test_joystick_center_calibration_averages_samples() {
   TEST_ASSERT_EQUAL_INT(2100, calibratedJoystickCenter(samples, 4, 2048));
 }
 
-void test_transmitter_arming_requires_centered_joystick() {
-  TEST_ASSERT_FALSE(canArmTransmitter(80, 50));
-  TEST_ASSERT_TRUE(canArmTransmitter(50, 50));
-  TEST_ASSERT_TRUE(canArmTransmitter(-50, 50));
-}
-
 void test_transmitter_safety_forces_zero_until_armed() {
   TEST_ASSERT_EQUAL_INT16(0, safeThrottleForArming(700, false));
   TEST_ASSERT_EQUAL_INT16(-300, safeThrottleForArming(-300, true));
+}
+
+void test_transmitter_arming_requires_full_brake_hold_for_three_seconds() {
+  uint32_t holdStartMs = 0;
+  bool holding = false;
+
+  TEST_ASSERT_FALSE(shouldArmByBrakeHold(-899, 1000, holdStartMs, holding, -900, 3000));
+  TEST_ASSERT_FALSE(holding);
+
+  TEST_ASSERT_FALSE(shouldArmByBrakeHold(-950, 2000, holdStartMs, holding, -900, 3000));
+  TEST_ASSERT_TRUE(holding);
+  TEST_ASSERT_EQUAL_UINT32(2000, holdStartMs);
+
+  TEST_ASSERT_FALSE(shouldArmByBrakeHold(-950, 4999, holdStartMs, holding, -900, 3000));
+  TEST_ASSERT_TRUE(shouldArmByBrakeHold(-950, 5000, holdStartMs, holding, -900, 3000));
+}
+
+void test_transmitter_brake_hold_resets_when_brake_released() {
+  uint32_t holdStartMs = 0;
+  bool holding = false;
+
+  TEST_ASSERT_FALSE(shouldArmByBrakeHold(-950, 1000, holdStartMs, holding, -900, 3000));
+  TEST_ASSERT_FALSE(shouldArmByBrakeHold(-200, 2500, holdStartMs, holding, -900, 3000));
+  TEST_ASSERT_FALSE(holding);
+  TEST_ASSERT_FALSE(shouldArmByBrakeHold(-950, 3000, holdStartMs, holding, -900, 3000));
+  TEST_ASSERT_EQUAL_UINT32(3000, holdStartMs);
 }
 
 void test_throttle_slew_rate_limits_step_changes() {
@@ -217,8 +237,9 @@ void setup() {
   RUN_TEST(test_pwm_mapping_defaults_invalid_speed_level_to_level_1);
   RUN_TEST(test_joystick_mapping_uses_calibrated_center_and_deadzone);
   RUN_TEST(test_joystick_center_calibration_averages_samples);
-  RUN_TEST(test_transmitter_arming_requires_centered_joystick);
   RUN_TEST(test_transmitter_safety_forces_zero_until_armed);
+  RUN_TEST(test_transmitter_arming_requires_full_brake_hold_for_three_seconds);
+  RUN_TEST(test_transmitter_brake_hold_resets_when_brake_released);
   RUN_TEST(test_throttle_slew_rate_limits_step_changes);
   RUN_TEST(test_receiver_failsafe_clears_all_stale_control_inputs);
   RUN_TEST(test_receiver_link_alert_beeps_immediately_then_every_two_seconds);

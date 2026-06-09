@@ -47,7 +47,8 @@ constexpr uint8_t ESPNOW_CHANNEL = 1;
 constexpr uint8_t LCD_BRIGHTNESS = 140;
 constexpr int JOYSTICK_DEADZONE = 50;
 constexpr int ADC_CENTER = 2048;
-constexpr int ARM_THROTTLE_THRESHOLD = 50;
+constexpr int ARM_BRAKE_THRESHOLD = -900;
+constexpr uint32_t ARM_BRAKE_HOLD_MS = 3000;
 constexpr int THROTTLE_SLEW_STEP = 40;
 constexpr int JOYSTICK_CENTER_ADJUST_STEP = 10;
 constexpr uint8_t LOW_BATTERY_THRESHOLD = 20;
@@ -228,6 +229,8 @@ bool transmitterArmed = false;
 bool settingsMode = false;
 bool joystickCalibrateRequested = false;
 int16_t joystickCenterAdjust = 0;
+uint32_t armBrakeHoldStartMs = 0;
+bool armBrakeHolding = false;
 bool connected = false;
 uint32_t lastRecvTime = 0;
 int16_t rssiValue = -100;
@@ -481,8 +484,11 @@ void calibrateJoystickCenter() {
 void readInputs() {
   const int16_t targetThrottle = joystickToThrottle(analogRead(JOYSTICK_PIN), joystickCenter, JOYSTICK_DEADZONE);
   joystickRawValue = targetThrottle;
-  if (!transmitterArmed && canArmTransmitter(targetThrottle, ARM_THROTTLE_THRESHOLD)) {
+  if (!settingsMode && !transmitterArmed &&
+      shouldArmByBrakeHold(targetThrottle, millis(), armBrakeHoldStartMs, armBrakeHolding,
+                           ARM_BRAKE_THRESHOLD, ARM_BRAKE_HOLD_MS)) {
     transmitterArmed = true;
+    armBrakeHolding = false;
     beep(BEEP_FREQ_CONNECTED, 80);
   }
   const int16_t safeTarget = settingsMode ? 0 : safeThrottleForArming(targetThrottle, transmitterArmed);
@@ -509,6 +515,7 @@ void readInputs() {
   if (button1Down && !lastButton1Down) {
     settingsMode = !settingsMode;
     transmitterArmed = false;
+    armBrakeHolding = false;
     joystickValue = 0;
     beep(BEEP_FREQ_BUTTON, 50);
   }
@@ -570,6 +577,7 @@ void lvTouchReadCallback(lv_indev_drv_t *, lv_indev_data_t *data) {
       case S3UiTouchAction::CloseSettings:
         settingsMode = false;
         transmitterArmed = false;
+        armBrakeHolding = false;
         joystickValue = 0;
         beep(BEEP_FREQ_BUTTON, 50);
         break;
@@ -753,6 +761,7 @@ void loop() {
     joystickCenter = clampInt(joystickCenter + joystickCenterAdjust, 1, 4094);
     joystickCenterAdjust = 0;
     transmitterArmed = false;
+    armBrakeHolding = false;
     joystickValue = 0;
   }
   if (joystickCalibrateRequested) {
@@ -760,6 +769,7 @@ void loop() {
     joystickValue = 0;
     calibrateJoystickCenter();
     transmitterArmed = false;
+    armBrakeHolding = false;
   }
 
   const uint32_t now = millis();

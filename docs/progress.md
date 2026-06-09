@@ -934,3 +934,34 @@ SquareLine 页面已经承接主要参数显示后，删除 `src/transmitter_s3/
 - `pio run -e transmitter -t upload --upload-port COM3`：SUCCESS。
 - `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
 - 实物 UI 和触摸设置页操作仍需人工观察确认。
+
+## 2026-06-09 解锁逻辑修正和 S3 BMP 显示修复
+
+### 现象
+
+- 上一版误做成“摇杆回中自动解锁”，实际需求是“刹车拉满 3 秒解锁”。
+- S3 删除旧手写参数层后，BMP 参数只剩 SquareLine 的 `ui_LabelBmp280`，该 Label 没有显式文字样式，可能出现看不清或文字过长挤压。
+
+### 已修改
+
+- `include/control_logic.h` 新增 `shouldArmByBrakeHold()`。
+- C3 和 S3 发射端均改为：摇杆拉到最大刹车方向并保持 3 秒后解锁。
+- 松开刹车或进入/退出设置页会重置解锁保持计时。
+- S3 `ui_LabelBmp280` 在绑定层强制设置白色、12px 字体、居中对齐。
+- S3 BMP 显示改为两行：`xxxxhPa` + `xxxm`。
+- 更新 `docs/user-guide.md` 和 `docs/squareline-data-binding.md`。
+
+### 验证
+
+- 新增/调整 native 单测：
+  - `test_transmitter_arming_requires_full_brake_hold_for_three_seconds`
+  - `test_transmitter_brake_hold_resets_when_brake_released`
+- 初次运行 `pio test -e native` 因 `shouldArmByBrakeHold()` 未实现失败，随后实现后通过。
+- `pio test -e native`：PASS，25/25。
+- `pio run -e transmitter`：SUCCESS。
+- `pio run -e s3_transmitter`：SUCCESS。
+- `pio run -e receiver`：SUCCESS。
+- `git diff --check`：PASS，仅有 CRLF 换行提示。
+- `pio run -e transmitter -t upload --upload-port COM3`：SUCCESS。
+- `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+- S3 BMP 参数的实物显示仍需上电后人工确认。

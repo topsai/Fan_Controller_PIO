@@ -62,12 +62,28 @@ inline int calibratedJoystickCenter(const int *samples, size_t sampleCount, int 
   return (int)((sum + (long)sampleCount / 2) / (long)sampleCount);
 }
 
-inline bool canArmTransmitter(int16_t throttle, int16_t centerThreshold) {
-  return throttle >= -centerThreshold && throttle <= centerThreshold;
-}
-
 inline int16_t safeThrottleForArming(int16_t throttle, bool armed) {
   return armed ? throttle : 0;
+}
+
+inline bool shouldArmByBrakeHold(
+  int16_t throttle,
+  uint32_t nowMs,
+  uint32_t &holdStartMs,
+  bool &holding,
+  int16_t brakeThreshold,
+  uint32_t holdDurationMs
+) {
+  if (throttle > brakeThreshold) {
+    holding = false;
+    return false;
+  }
+  if (!holding) {
+    holding = true;
+    holdStartMs = nowMs;
+    return false;
+  }
+  return nowMs - holdStartMs >= holdDurationMs;
 }
 
 inline int16_t slewLimitedThrottle(int16_t currentThrottle, int16_t targetThrottle, int16_t maxStep) {

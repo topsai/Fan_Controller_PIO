@@ -42,7 +42,8 @@
 #define OLED_HEIGHT 64
 #define OLED_ADDR 0x3C
 #define ESPNOW_CHANNEL 1
-#define ARM_THROTTLE_THRESHOLD 50
+#define ARM_BRAKE_THRESHOLD -900
+#define ARM_BRAKE_HOLD_MS 3000
 #define THROTTLE_SLEW_STEP 40
 
 // ========== CW2015寄存器 ==========
@@ -120,6 +121,8 @@ int joystickCenter = ADC_CENTER;
 bool transmitterArmed = false;
 bool settingsMode = false;
 bool joystickCalibrateRequested = false;
+uint32_t armBrakeHoldStartMs = 0;
+bool armBrakeHolding = false;
 
 // 连接状态
 volatile bool connected = false;
@@ -249,8 +252,11 @@ void readJoystick() {
   int raw = analogRead(JOYSTICK_PIN);
   const int16_t targetThrottle = joystickToThrottle(raw, joystickCenter, JOYSTICK_DEADZONE);
   joystickRawValue = targetThrottle;
-  if (!transmitterArmed && canArmTransmitter(targetThrottle, ARM_THROTTLE_THRESHOLD)) {
+  if (!settingsMode && !transmitterArmed &&
+      shouldArmByBrakeHold(targetThrottle, millis(), armBrakeHoldStartMs, armBrakeHolding,
+                           ARM_BRAKE_THRESHOLD, ARM_BRAKE_HOLD_MS)) {
     transmitterArmed = true;
+    armBrakeHolding = false;
     beep(BEEP_FREQ_CONNECTED, 80);
   }
   const int16_t safeTarget = settingsMode ? 0 : safeThrottleForArming(targetThrottle, transmitterArmed);
@@ -293,6 +299,7 @@ void readButtons() {
       button1Pressed = true;
       settingsMode = !settingsMode;
       transmitterArmed = false;
+      armBrakeHolding = false;
       joystickValue = 0;
       buttonState = 0;
       beep(BEEP_FREQ_BUTTON, 50);  // 按键音
@@ -494,6 +501,9 @@ void updateDisplay() {
   const char *direction = joystickValue > 0 ? "THR" : "BRK";
   // display.printf("%s:%4d  BTN:%02X\n", direction, abs(joystickValue), buttonState);
   display.printf("%s SPD:%d %s:%4d\n", transmitterArmed ? "ARM" : "LOCK", speedLevel, direction, abs(joystickValue));
+  if (!transmitterArmed && joystickRawValue <= ARM_BRAKE_THRESHOLD) {
+    display.println("Hold BRK 3s");
+  }
   display.setTextSize(4);
   // display.println("30 KM");
   if (connected) {
@@ -556,6 +566,7 @@ void loop() {
     joystickValue = 0;
     calibrateJoystickCenter();
     transmitterArmed = false;
+    armBrakeHolding = false;
   }
   if (readBatteryFlag && cw2015Available) {
     portENTER_CRITICAL(&timerMux);

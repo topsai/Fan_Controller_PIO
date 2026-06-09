@@ -149,6 +149,9 @@ void s3_ui_init() {
 
   if (bmp280ValueLabel() != nullptr) {
     lv_label_set_text(bmp280ValueLabel(), "BMP N/A");
+    lv_obj_set_style_text_color(bmp280ValueLabel(), lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(bmp280ValueLabel(), &lv_font_montserrat_12, LV_PART_MAIN);
+    lv_obj_set_style_text_align(bmp280ValueLabel(), LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
   }
 
   if (throttleValueBar() != nullptr) {
@@ -215,7 +218,7 @@ void s3_ui_update(const S3UiState &state) {
 
   if (bmp280ValueLabel() != nullptr) {
     if (state.bmp280Valid) {
-      snprintf(buffer, sizeof(buffer), "%.0fhPa %.0fm", state.bmp280PressureHpa, state.bmp280AltitudeM);
+      snprintf(buffer, sizeof(buffer), "%.0fhPa\n%.0fm", state.bmp280PressureHpa, state.bmp280AltitudeM);
     } else {
       snprintf(buffer, sizeof(buffer), "BMP N/A");
     }
