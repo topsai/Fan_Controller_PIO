@@ -1133,9 +1133,33 @@ S3 页面上的本机电量和 BMP280 气压/海拔偶发变成 `0` 或无效显
 
 ### 验证
 
-- `pio test -e native`：当前 Windows 环境缺少 `gcc/g++`，native 测试未能启动，失败点是工具链不可用，不是断言失败。
+- `pio test -e native`：工具链修复后通过，31/31 PASS。
 - `pio run -e s3_transmitter`：通过。
 - `pio run -e s3_transmitter -t upload --upload-port COM3`：通过，已写入 COM3 上的 ESP32-S3。
+
+## 2026-06-15 Windows native 测试工具链修复
+
+### 现象
+
+当前 Windows 环境没有全局 `gcc/g++`，导致 `pio test -e native` 在编译阶段报错，无法运行 Unity native 单测。
+
+### 原因
+
+- 本机 PATH 中没有 `gcc/g++/clang/cl`。
+- PlatformIO `native` 环境默认调用 `gcc/g++`。
+- 安装 `platformio/toolchain-gccmingw32` 后，MinGW GCC 5.1 默认 C++98，需要显式启用 C++11 才能编译项目中的 `nullptr`。
+- 测试 exe 运行阶段还需要 MinGW runtime DLL；通过静态链接避免依赖外部 PATH。
+
+### 已修改
+
+- `env:native` 增加 `platformio/toolchain-gccmingw32@~1.50100.0`。
+- 新增 `tools/platformio/native_mingw_toolchain.py`，Windows 下自动把 PlatformIO MinGW 工具链注入 native 构建环境。
+- `env:native` 增加 `-std=gnu++11`。
+- native 链接增加 `-static -static-libgcc -static-libstdc++`，避免测试程序运行时找不到 MinGW DLL。
+
+### 验证
+
+- 清理 `.pio/build/native` 后直接运行 `pio test -e native`：通过，31/31 PASS。
 
 ## 2026-06-15 S3 MCU 内部温度显示
 
