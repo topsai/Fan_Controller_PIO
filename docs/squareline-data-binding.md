@@ -22,7 +22,7 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 | 显示内容 | SquareLine 控件类型 | 推荐对象名 | 当前数据来源 | 绑定代码 |
 | --- | --- | --- | --- | --- |
 | 电池电量百分比 | Arc | `ui_ArcBattery` | `S3UiState::cw2015Soc` | `lv_arc_set_value()` |
-| 电池电量文字 | Label | `ui_LabelBattery` | `cw2015Valid/cw2015Voltage/cw2015Soc` | `lv_label_set_text()` |
+| 电池电量文字 | Label | `ui_LabelBattery` | `cw2015Valid/cw2015Soc` | `lv_label_set_text()` |
 | 连接状态 | Label | `ui_LabelStatus` | `connected` | `lv_label_set_text()` + `lv_obj_set_style_text_color()` |
 | VESC 电压文字 | Label | `ui_LabelStatusVoltage` | `connected/receiverVoltageX100` | `lv_label_set_text()` |
 | VESC 电压进度 | Arc | `ui_ArcStatusVoltage` | `connected/receiverVoltageX100` | `lv_arc_set_value()` |
@@ -32,10 +32,6 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 | BMP280 | Label | `ui_LabelBmp280` | `bmp280Valid/bmp280PressureHpa/bmp280AltitudeM` | `lv_label_set_text()` |
 | QMC5883L 航向 | Image | `ui_Compass` | `qmcValid/qmcHeadingDeg` | `lv_img_set_angle()` |
 | ESP32-S3 MCU 温度 | Label | `ui_MCUTemp` | `mcuTemperatureC` | `lv_label_set_text()` |
-| 按钮/RSSI | Label | `ui_LabelButtons` | `buttonState/rssiValue` | `lv_label_set_text()` |
-| FPS | Label | `ui_LabelFps` | `displayFps` | 待添加 SquareLine 控件后绑定 |
-| 触摸坐标 | Label | `ui_LabelTouch` | touch callback | 待添加 SquareLine 控件后绑定 |
-| 触摸点 | Object | `ui_DotTouch` | touch callback | 待添加 SquareLine 控件后绑定 |
 
 当前 SquareLine 导出的电池 Arc 实例名是 `ui_ArcBattery`，电量文字是 `ui_LabelBattery`，代码已按这两个实际名称绑定。最终以 `src/transmitter_s3/ui/generated/ui_Screen1.h` 中的 `extern lv_obj_t * ...` 声明为准。
 
@@ -55,7 +51,7 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 
 当前 SquareLine 导出的 MCU 温度 Label 实例名是 `ui_MCUTemp`。S3 主程序通过 Arduino-ESP32 的 `temperatureRead()` 读取 ESP32-S3 内部温度，写入 `S3UiState::mcuTemperatureC`，UI 层显示为一位小数格式，例如 `43.2C`；无效值显示 `--.-C`。
 
-旧版手写叠加参数层已经删除，包括标题、连接状态、档位/油门、速度、电池、BMP280、航向、按钮/RSSI、FPS、触摸坐标和占位 GPIO 提示。后续新增显示内容应优先在 SquareLine 创建控件，再在 `src/transmitter_s3/ui/ui.cpp` 里绑定数据。
+旧版手写叠加参数层已经删除，包括标题、连接状态、档位/油门、速度、电池、BMP280、航向、按钮/RSSI、FPS、触摸坐标和占位 GPIO 提示。后续新增显示内容应优先在 SquareLine 创建控件，再在 `src/transmitter_s3/ui/ui.cpp` 里绑定数据；没有实际控件的占位项不再写入当前绑定表。
 
 当前 S3 摇杆设置页是 `src/transmitter_s3/ui/ui.cpp` 创建的临时 LVGL 覆盖层，用于按钮 1 进入设置、触摸校准和中位微调。它不写入 `src/transmitter_s3/ui/generated/`，不会被 SquareLine 导出覆盖。后续如果要统一视觉风格，可以在 SquareLine 中创建正式设置页面，再把触摸动作绑定迁移过去。
 

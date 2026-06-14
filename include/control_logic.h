@@ -169,13 +169,6 @@ inline bool shouldSignalReceiverConnectionSuccess(bool wasConnected, bool wasFai
   return !wasConnected || wasFailsafeActive;
 }
 
-inline uint16_t displayFpsForFrameCount(uint16_t frameCount, uint32_t elapsedMs) {
-  if (elapsedMs == 0) {
-    return 0;
-  }
-  return (uint16_t)(((uint32_t)frameCount * 1000U + elapsedMs / 2U) / elapsedMs);
-}
-
 inline void rememberStatusTarget(const uint8_t *sourceMac, uint8_t *targetMac, bool &hasTarget) {
   if (sourceMac == nullptr || targetMac == nullptr) {
     return;

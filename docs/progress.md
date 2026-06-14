@@ -1161,6 +1161,24 @@ S3 页面上的本机电量和 BMP280 气压/海拔偶发变成 `0` 或无效显
 
 - 清理 `.pio/build/native` 后直接运行 `pio test -e native`：通过，31/31 PASS。
 
+## 2026-06-15 S3 UI 冗余占位清理
+
+### 目标
+
+去掉当前 SquareLine 页面已经没有实际控件消费者的占位信息和无用传参，减少后续换电脑继续开发时的误导。
+
+### 已修改
+
+- `S3UiState` 删除未被 `src/transmitter_s3/ui/ui.cpp` 使用的字段：`rssiValue`、`buttonState`、`cw2015Voltage`、`bmp280TemperatureC`、`displayFps`。
+- `src/transmitter_s3/main.cpp` 删除向 UI 状态传递上述无用字段的代码。
+- 删除当前无控件显示的 FPS 采样链路：`displayFrameCount`、`displayFpsForFrameCount()`、`S3_DISPLAY_FPS_SAMPLE_INTERVAL_MS` 和对应单测。
+- `docs/squareline-data-binding.md` 删除 `ui_LabelButtons`、`ui_LabelFps`、`ui_LabelTouch`、`ui_DotTouch` 这些当前页面不存在的占位绑定行。
+
+### 验证
+
+- `pio test -e native`：通过，30/30 PASS。
+- `pio run -e s3_transmitter`：通过。
+
 ## 2026-06-15 S3 MCU 内部温度显示
 
 ### 目标

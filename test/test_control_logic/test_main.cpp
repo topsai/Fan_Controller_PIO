@@ -167,7 +167,6 @@ void test_s3_lvgl_timing_uses_low_latency_profile() {
   TEST_ASSERT_EQUAL_UINT16(5, S3_LVGL_INPUT_READ_PERIOD_MS);
   TEST_ASSERT_EQUAL_UINT8(2, S3_LVGL_HANDLER_INTERVAL_MS);
   TEST_ASSERT_EQUAL_UINT8(2, S3_MAIN_LOOP_DELAY_MS);
-  TEST_ASSERT_EQUAL_UINT16(1000, S3_DISPLAY_FPS_SAMPLE_INTERVAL_MS);
 }
 
 void test_s3_lvgl_display_dma_is_enabled() {
@@ -178,12 +177,6 @@ void test_s3_espnow_link_uses_stable_radio_profile() {
   TEST_ASSERT_TRUE(S3_ESPNOW_STATUS_TIMEOUT_MS >= 1000);
   TEST_ASSERT_EQUAL_UINT16(60, S3_ESPNOW_TX_POWER_DBM_X4);
   TEST_ASSERT_TRUE(S3_ESPNOW_CONTROL_TASK_ENABLED);
-}
-
-void test_display_fps_rounds_from_frame_count_and_elapsed_time() {
-  TEST_ASSERT_EQUAL_UINT16(59, displayFpsForFrameCount(59, 1000));
-  TEST_ASSERT_EQUAL_UINT16(60, displayFpsForFrameCount(30, 500));
-  TEST_ASSERT_EQUAL_UINT16(0, displayFpsForFrameCount(10, 0));
 }
 
 void test_receiver_status_target_tracks_last_valid_transmitter() {
@@ -306,7 +299,6 @@ void setup() {
   RUN_TEST(test_s3_lvgl_timing_uses_low_latency_profile);
   RUN_TEST(test_s3_lvgl_display_dma_is_enabled);
   RUN_TEST(test_s3_espnow_link_uses_stable_radio_profile);
-  RUN_TEST(test_display_fps_rounds_from_frame_count_and_elapsed_time);
   RUN_TEST(test_receiver_status_target_tracks_last_valid_transmitter);
   RUN_TEST(test_s3_battery_arc_value_clamps_and_rounds_soc);
   RUN_TEST(test_s3_speed_label_color_uses_speed_bands);

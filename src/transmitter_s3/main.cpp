@@ -223,9 +223,6 @@ lv_color_t lvBuffer[LCD_WIDTH * LVGL_BUFFER_LINES];
 lv_disp_drv_t lvDisplayDriver;
 lv_indev_drv_t lvTouchDriver;
 uint32_t lastLvTickMs = 0;
-uint32_t lastDisplayFpsSampleMs = 0;
-uint16_t displayFrameCount = 0;
-uint16_t displayFps = 0;
 
 Cw2015Data cw2015;
 Bmp280Data bmp280;
@@ -592,7 +589,6 @@ void lvFlushCallback(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *col
 #else
   display.pushImage(area->x1, area->y1, width, height, reinterpret_cast<const uint16_t *>(colorP));
 #endif
-  displayFrameCount++;
   lv_disp_flush_ready(disp);
 }
 
@@ -767,33 +763,20 @@ void updateBatteryAlert() {
 }
 
 void updateDashboard() {
-  const uint32_t now = millis();
-  const uint32_t elapsedMs = now - lastDisplayFpsSampleMs;
-  if (elapsedMs >= S3_DISPLAY_FPS_SAMPLE_INTERVAL_MS) {
-    displayFps = displayFpsForFrameCount(displayFrameCount, elapsedMs);
-    displayFrameCount = 0;
-    lastDisplayFpsSampleMs = now;
-  }
-
   S3UiState state = {};
   state.connected = connected;
   state.receiverVoltageX100 = receiverVoltageX100;
   state.speedLevel = speedLevel;
   state.joystickValue = joystickValue;
   state.receiverSpeed = receiverSpeed;
-  state.rssiValue = rssiValue;
-  state.buttonState = buttonState;
   state.cw2015Valid = cw2015.valid;
-  state.cw2015Voltage = cw2015.voltage;
   state.cw2015Soc = cw2015.soc;
   state.bmp280Valid = bmp280.valid;
-  state.bmp280TemperatureC = bmp280.temperatureC;
   state.bmp280PressureHpa = bmp280.pressureHpa;
   state.bmp280AltitudeM = bmp280.altitudeM;
   state.qmcValid = qmc.valid;
   state.qmcHeadingDeg = qmc.headingDeg;
   state.mcuTemperatureC = mcuTemperatureC;
-  state.displayFps = displayFps;
   state.armed = transmitterArmed;
   state.settingsMode = settingsMode;
   state.joystickCenter = joystickCenter;
