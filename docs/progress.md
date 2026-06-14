@@ -1061,3 +1061,55 @@ S3 页面上的本机电量和 BMP280 气压/海拔偶发变成 `0` 或无效显
 - `pio run -e receiver`：第一次并行运行遇到 PlatformIO cache 权限/锁提示，单独重跑 SUCCESS。
 - `git diff --check`：PASS，仅有 CRLF 换行提示。
 - `pio run -e s3_transmitter -t upload --upload-port COM7`：SUCCESS。
+
+## 2026-06-14 Codex 跨电脑交接文档
+
+### 目标
+
+让项目文档承担长期同步的工作记忆，减少对某一台电脑上 Codex 会话历史的依赖。换电脑或新建 Codex 会话后，可以直接从仓库文档恢复上下文并继续开发。
+
+### 已完成
+
+- 新增 `docs/codex-handoff.md`，作为换电脑、新 Codex 会话或恢复项目上下文时的入口。
+- 在交接文档中记录：
+  - 换电脑后的阅读顺序和启动命令。
+  - 当前已知项目状态。
+  - C3 发射端、C3 接收端、S3 高级发射端的常用串口。
+  - 哪些信息属于本机相关，换电脑后需要重新确认。
+  - 给下一次 Codex 的中文启动提示。
+  - 每次阶段性结束前需要更新哪些文档。
+- 更新 `docs/README.md`，把 `codex-handoff.md` 加入文档索引和维护规则。
+- 更新 `docs/workflow.md`，把交接信息维护加入常规推进流程和推送前检查清单。
+
+### 验证
+
+- 已用 UTF-8 读取确认 `docs/codex-handoff.md`、`docs/README.md` 和 `docs/workflow.md` 内容正常。
+- 本次仅修改文档，未运行固件编译或硬件测试。
+
+### 下一步
+
+1. 后续每次阶段性开发结束时，优先更新 `docs/progress.md`。
+2. 如果影响换电脑继续开发，同步更新 `docs/codex-handoff.md`。
+3. 推送 GitHub 前，确认本机 `.vscode/` 改动是否需要提交，避免把仅属于本机的设置误作为项目共享配置。
+
+## 2026-06-14 VS Code 配置同步整理
+
+### 目标
+
+整理已经提交过的 `.vscode/` 内容，只保留适合跨电脑同步的项目通用配置，把 PlatformIO 自动生成且包含本机绝对路径的文件从 GitHub 后续版本中移除。
+
+### 已完成
+
+- 保留 `.vscode/extensions.json`，用于推荐安装 PlatformIO 插件。
+- 整理 `.vscode/settings.json`，移除本机绝对工具链路径，改用 PlatformIO 配置提供器。
+- 在 `.gitignore` 中忽略：
+  - `.vscode/c_cpp_properties.json`
+  - `.vscode/launch.json`
+  - `.vscode/ipch/`
+  - `.vscode/.browse.c_cpp.db*`
+- 计划从 Git 跟踪中移除 `.vscode/c_cpp_properties.json` 和 `.vscode/launch.json`，但保留本地文件供当前电脑继续使用。
+
+### 验证
+
+- 已确认 `.vscode/c_cpp_properties.json` 和 `.vscode/launch.json` 为自动生成文件，包含本机项目路径和 PlatformIO 工具链路径，不适合作为仓库共享配置。
+- 已确认 `.vscode/extensions.json` 只包含插件推荐，适合继续提交。

@@ -16,6 +16,7 @@
 | `test-runs/` | 实际测试执行记录 |
 | `unit-test-plan.md` | 后续可自动化测试的设计和用例清单 |
 | `workflow.md` | 每次代码更新、测试、上传固件、文档和 GitHub 推送流程 |
+| `codex-handoff.md` | 换电脑或新 Codex 会话继续开发时的交接入口 |
 | `ui-workflow.md` | S3 SquareLine Studio 工程、导出目录、生成代码和适配层边界 |
 | `squareline-data-binding.md` | SquareLine 控件命名、数据来源和代码绑定规则 |
 | `progress.md` | 项目推进记录 |
@@ -41,3 +42,4 @@
 4. 修复 bug 时，在 `bugs.md` 添加记录，并在 `test-plan.md` 或 `unit-test-plan.md` 补充验证方法。
 5. 每次阶段性推进，在 `progress.md` 增加日期、目标、结果、下一步。
 6. 每次代码更新必须按 `workflow.md` 完成测试、文档、固件上传和 GitHub 推送。
+7. 如果阶段性工作会影响下一次接手，更新 `codex-handoff.md` 中的当前状态或待确认事项。

@@ -14,3 +14,9 @@ tools/ui_projects/**/*.bak
 # OS/editor noise
 Thumbs.db
 .DS_Store
+
+# VS Code / PlatformIO local generated files
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+.vscode/ipch/
+.vscode/.browse.c_cpp.db*
