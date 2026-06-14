@@ -252,6 +252,18 @@ void test_s3_compass_angle_uses_qmc_heading_in_lvgl_tenths() {
   TEST_ASSERT_EQUAL_INT16(3590, s3CompassAngleForHeading(true, -1.0f));
 }
 
+void test_s3_mcu_temperature_formats_one_decimal_or_placeholder() {
+  char buffer[16] = {};
+  s3FormatMcuTemperatureText(buffer, sizeof(buffer), 43.24f);
+  TEST_ASSERT_EQUAL_STRING("43.2C", buffer);
+
+  s3FormatMcuTemperatureText(buffer, sizeof(buffer), 43.25f);
+  TEST_ASSERT_EQUAL_STRING("43.3C", buffer);
+
+  s3FormatMcuTemperatureText(buffer, sizeof(buffer), NAN);
+  TEST_ASSERT_EQUAL_STRING("--.-C", buffer);
+}
+
 void test_s3_bmp280_altitude_uses_standard_sea_level_pressure() {
   TEST_ASSERT_FLOAT_WITHIN(0.1f, 0.0f, s3Bmp280AltitudeMeters(1013.25f));
   TEST_ASSERT_FLOAT_WITHIN(1.0f, 110.9f, s3Bmp280AltitudeMeters(1000.0f));
@@ -302,6 +314,7 @@ void setup() {
   RUN_TEST(test_s3_voltage_arc_value_clamps_to_vesc_display_range);
   RUN_TEST(test_s3_throttle_bar_keeps_center_and_uses_direction_colors);
   RUN_TEST(test_s3_compass_angle_uses_qmc_heading_in_lvgl_tenths);
+  RUN_TEST(test_s3_mcu_temperature_formats_one_decimal_or_placeholder);
   RUN_TEST(test_s3_bmp280_altitude_uses_standard_sea_level_pressure);
   RUN_TEST(test_s3_cw2015_reading_rejects_transient_zero_or_nan_values);
   RUN_TEST(test_s3_bmp280_reading_rejects_transient_zero_or_nan_values);

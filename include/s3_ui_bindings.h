@@ -76,6 +76,17 @@ inline int16_t s3CompassAngleForHeading(bool valid, float headingDeg) {
   return (int16_t)(normalized * 10.0f + 0.5f);
 }
 
+inline void s3FormatMcuTemperatureText(char *buffer, size_t bufferSize, float temperatureC) {
+  if (bufferSize == 0) {
+    return;
+  }
+  if (!isfinite(temperatureC)) {
+    snprintf(buffer, bufferSize, "--.-C");
+    return;
+  }
+  snprintf(buffer, bufferSize, "%.1fC", temperatureC);
+}
+
 inline float s3Bmp280AltitudeMeters(float pressureHpa) {
   if (isnan(pressureHpa) || pressureHpa <= 0.0f) {
     return NAN;

@@ -57,6 +57,10 @@ lv_obj_t *compassImage() {
   return ui_Compass;
 }
 
+lv_obj_t *mcuTemperatureLabel() {
+  return ui_MCUTemp;
+}
+
 lv_obj_t *createSettingsButton(lv_obj_t *parent, const char *text, int16_t x, int16_t y, int16_t w, int16_t h) {
   lv_obj_t *button = lv_btn_create(parent);
   lv_obj_set_size(button, w, h);
@@ -183,6 +187,12 @@ void s3_ui_init() {
     lv_obj_set_style_opa(compassImage(), LV_OPA_50, LV_PART_MAIN);
   }
 
+  if (mcuTemperatureLabel() != nullptr) {
+    lv_label_set_text(mcuTemperatureLabel(), "--.-C");
+    lv_obj_set_style_text_color(mcuTemperatureLabel(), lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(mcuTemperatureLabel(), &lv_font_montserrat_12, LV_PART_MAIN);
+  }
+
   createSettingsPanel();
 }
 
@@ -255,6 +265,11 @@ void s3_ui_update(const S3UiState &state) {
   if (compassImage() != nullptr) {
     lv_img_set_angle(compassImage(), compassAngle);
     lv_obj_set_style_opa(compassImage(), state.qmcValid ? LV_OPA_COVER : LV_OPA_50, LV_PART_MAIN);
+  }
+
+  if (mcuTemperatureLabel() != nullptr) {
+    s3FormatMcuTemperatureText(buffer, sizeof(buffer), state.mcuTemperatureC);
+    lv_label_set_text(mcuTemperatureLabel(), buffer);
   }
 
   s3_ui_set_settings_visible(state.settingsMode);

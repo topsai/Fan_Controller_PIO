@@ -20,6 +20,7 @@ struct S3UiState {
   float bmp280AltitudeM = NAN;
   bool qmcValid = false;
   float qmcHeadingDeg = NAN;
+  float mcuTemperatureC = NAN;
   uint16_t displayFps = 0;
   bool armed = false;
   bool settingsMode = false;

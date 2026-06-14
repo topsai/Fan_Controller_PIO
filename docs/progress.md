@@ -1136,3 +1136,24 @@ S3 页面上的本机电量和 BMP280 气压/海拔偶发变成 `0` 或无效显
 - `pio test -e native`：当前 Windows 环境缺少 `gcc/g++`，native 测试未能启动，失败点是工具链不可用，不是断言失败。
 - `pio run -e s3_transmitter`：通过。
 - `pio run -e s3_transmitter -t upload --upload-port COM3`：通过，已写入 COM3 上的 ESP32-S3。
+
+## 2026-06-15 S3 MCU 内部温度显示
+
+### 目标
+
+把 SquareLine 新增的 `MCUTemp` Label 接入 ESP32-S3 内部温度，让主屏显示类似 `43.2C` 的 MCU 温度。
+
+### 已修改
+
+- SquareLine 导出层新增 `ui_MCUTemp` Label。
+- `src/transmitter_s3/main.cpp` 通过 `temperatureRead()` 读取 ESP32-S3 内部温度，并写入 `S3UiState::mcuTemperatureC`。
+- `src/transmitter_s3/ui/ui.cpp` 绑定 `ui_MCUTemp`，启动默认显示 `--.-C`，有效读数显示一位小数摄氏温度。
+- `include/s3_ui_bindings.h` 新增 `s3FormatMcuTemperatureText()`，统一格式化为 `43.2C` 或 `--.-C`。
+- `test/test_control_logic/test_main.cpp` 新增 MCU 温度格式化单测。
+- 更新 `docs/squareline-data-binding.md`，记录 `ui_MCUTemp` 的数据来源和显示格式。
+
+### 验证
+
+- `pio test -e native`：当前 Windows 环境缺少 `gcc/g++`，native 测试未能启动，失败点是工具链不可用，不是断言失败。
+- `pio run -e s3_transmitter`：通过。
+- `pio run -e s3_transmitter -t upload --upload-port COM3`：通过，已写入 COM3 上的 ESP32-S3。

@@ -27,6 +27,7 @@ extern lv_obj_t *ui_BarThrottle;
 extern lv_obj_t *ui_ArcStatusVoltage;
 extern lv_obj_t *ui_LabelStatusVoltage;
 extern lv_obj_t *ui_Compass;
+extern lv_obj_t *ui_MCUTemp;
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus

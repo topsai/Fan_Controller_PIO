@@ -230,6 +230,7 @@ uint16_t displayFps = 0;
 Cw2015Data cw2015;
 Bmp280Data bmp280;
 Qmc5883lData qmc;
+float mcuTemperatureC = NAN;
 bool auxI2cFound[128] = {};
 uint8_t receiverMac[] = {0xAC, 0xEB, 0xE6, 0x44, 0xC5, 0x90};
 
@@ -496,6 +497,7 @@ void initLocalSensors() {
 }
 
 void readLocalSensors() {
+  mcuTemperatureC = temperatureRead();
   readCw2015();
   readBmp280();
   readQmc5883l();
@@ -790,6 +792,7 @@ void updateDashboard() {
   state.bmp280AltitudeM = bmp280.altitudeM;
   state.qmcValid = qmc.valid;
   state.qmcHeadingDeg = qmc.headingDeg;
+  state.mcuTemperatureC = mcuTemperatureC;
   state.displayFps = displayFps;
   state.armed = transmitterArmed;
   state.settingsMode = settingsMode;

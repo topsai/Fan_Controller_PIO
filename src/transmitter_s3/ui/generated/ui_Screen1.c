@@ -5,7 +5,7 @@
 
 #include "ui.h"
 
-lv_obj_t *ui_Screen1 = NULL;lv_obj_t *ui_bg_1 = NULL;lv_obj_t *ui_ArcBattery = NULL;lv_obj_t *ui_LabelBattery = NULL;lv_obj_t *ui_LabelSpeed = NULL;lv_obj_t *ui_kmh = NULL;lv_obj_t *ui_LabelStatus = NULL;lv_obj_t *ui_LabelControl = NULL;lv_obj_t *ui_LabelBmp280 = NULL;lv_obj_t *ui_BarThrottle = NULL;lv_obj_t *ui_ArcStatusVoltage = NULL;lv_obj_t *ui_LabelStatusVoltage = NULL;lv_obj_t *ui_Compass = NULL;
+lv_obj_t *ui_Screen1 = NULL;lv_obj_t *ui_bg_1 = NULL;lv_obj_t *ui_ArcBattery = NULL;lv_obj_t *ui_LabelBattery = NULL;lv_obj_t *ui_LabelSpeed = NULL;lv_obj_t *ui_kmh = NULL;lv_obj_t *ui_LabelStatus = NULL;lv_obj_t *ui_LabelControl = NULL;lv_obj_t *ui_LabelBmp280 = NULL;lv_obj_t *ui_BarThrottle = NULL;lv_obj_t *ui_ArcStatusVoltage = NULL;lv_obj_t *ui_LabelStatusVoltage = NULL;lv_obj_t *ui_Compass = NULL;lv_obj_t *ui_MCUTemp = NULL;
 // event funtions
 
 // build funtions
@@ -139,6 +139,14 @@ lv_obj_set_align( ui_Compass, LV_ALIGN_CENTER );
 lv_obj_add_flag( ui_Compass, LV_OBJ_FLAG_ADV_HITTEST );   /// Flags
 lv_obj_clear_flag( ui_Compass, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 
+ui_MCUTemp = lv_label_create(ui_Screen1);
+lv_obj_set_width( ui_MCUTemp, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_MCUTemp, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_x( ui_MCUTemp, 72 );
+lv_obj_set_y( ui_MCUTemp, 12 );
+lv_obj_set_align( ui_MCUTemp, LV_ALIGN_CENTER );
+lv_label_set_text(ui_MCUTemp,"0");
+
 }
 
 void ui_Screen1_screen_destroy(void)
@@ -159,5 +167,6 @@ ui_BarThrottle= NULL;
 ui_ArcStatusVoltage= NULL;
 ui_LabelStatusVoltage= NULL;
 ui_Compass= NULL;
+ui_MCUTemp= NULL;
 
 }
