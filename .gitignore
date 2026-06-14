@@ -10,6 +10,7 @@ tools/ui_projects/**/project.info
 tools/ui_projects/**/*.log
 tools/ui_projects/**/*.tmp
 tools/ui_projects/**/*.bak
+tools/ui_projects/**/assets/downloaded-image.*
 
 # OS/editor noise
 Thumbs.db

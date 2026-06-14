@@ -11,15 +11,15 @@ extern "C" {
 #endif
 
 #if defined __has_include
-#if __has_include("lvgl.h")
-#include "lvgl.h"
-#elif __has_include("lvgl/lvgl.h")
-#include "lvgl/lvgl.h"
+  #if __has_include("lvgl.h")
+    #include "lvgl.h"
+  #elif __has_include("lvgl/lvgl.h")
+    #include "lvgl/lvgl.h"
+  #else
+    #include "lvgl.h"
+  #endif
 #else
-#include "lvgl.h"
-#endif
-#else
-#include "lvgl.h"
+  #include "lvgl.h"
 #endif
 
 #include "ui_helpers.h"
@@ -27,26 +27,25 @@ extern "C" {
 #include "ui_comp_hook.h"
 #include "ui_events.h"
 
-///////////////////// SCREENS ////////////////////
 
+///////////////////// SCREENS ////////////////////
 #include "ui_Screen1.h"
 
-///////////////////// VARIABLES ////////////////////
+///////////////////// VARIABLES ////////////////////
 
-
-// EVENTS
-
-extern lv_obj_t * ui____initial_actions0;
+// EVENTS
+extern lv_obj_t *ui____initial_actions0;
 
 // IMAGES AND IMAGE SETS
-LV_IMG_DECLARE(ui_img_bg3_png);    // assets/bg3.png
+LV_IMG_DECLARE( ui_img_bg3_png);   // assets/bg3.png
+LV_IMG_DECLARE( ui_img_11_png);   // assets/11.png
 
 // FONTS
-LV_FONT_DECLARE(ui_font_H1);
-LV_FONT_DECLARE(ui_font_Number_big);
-LV_FONT_DECLARE(ui_font_Number_extra);
-LV_FONT_DECLARE(ui_font_Subtitle);
-LV_FONT_DECLARE(ui_font_Title);
+LV_FONT_DECLARE( ui_font_H1);
+LV_FONT_DECLARE( ui_font_Number_big);
+LV_FONT_DECLARE( ui_font_Number_extra);
+LV_FONT_DECLARE( ui_font_Subtitle);
+LV_FONT_DECLARE( ui_font_Title);
 
 // UI INIT
 void ui_init(void);

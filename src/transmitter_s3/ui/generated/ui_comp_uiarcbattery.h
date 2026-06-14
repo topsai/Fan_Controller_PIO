@@ -15,7 +15,7 @@ extern "C" {
 // COMPONENT uiArcBattery
 #define UI_COMP_UIARCBATTERY_UIARCBATTERY 0
 #define _UI_COMP_UIARCBATTERY_NUM 1
-lv_obj_t * ui_uiArcBattery_create(lv_obj_t * comp_parent);
+lv_obj_t *ui_uiArcBattery_create(lv_obj_t *comp_parent);
 
 #ifdef __cplusplus
 } /*extern "C"*/

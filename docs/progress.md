@@ -1113,3 +1113,26 @@ S3 页面上的本机电量和 BMP280 气压/海拔偶发变成 `0` 或无效显
 
 - 已确认 `.vscode/c_cpp_properties.json` 和 `.vscode/launch.json` 为自动生成文件，包含本机项目路径和 PlatformIO 工具链路径，不适合作为仓库共享配置。
 - 已确认 `.vscode/extensions.json` 只包含插件推荐，适合继续提交。
+
+## 2026-06-15 S3 指南针图片接入 QMC5883L 航向
+
+### 目标
+
+把 SquareLine 新增的 `Compass` 图片组件接入 S3 本机 QMC5883L 航向数据，让指南针箭头随 `qmcHeadingDeg` 实时旋转。
+
+### 已修改
+
+- SquareLine 导出层新增 `ui_Compass` 和图片资源 `ui_img_11_png`。
+- `src/transmitter_s3/ui/ui.cpp` 新增 `ui_Compass` 绑定：
+  - 初始化时设置图片中心为旋转轴。
+  - QMC 数据有效时按航向角实时旋转图片并正常显示。
+  - QMC 数据无效时保持 0 度并降低透明度。
+- `include/s3_ui_bindings.h` 新增 `s3CompassAngleForHeading()`，把角度归一化并转换为 LVGL 图片旋转单位。
+- `test/test_control_logic/test_main.cpp` 新增指南针角度换算单测。
+- 更新 `docs/squareline-data-binding.md`，记录 `ui_Compass` 的数据来源和绑定方式。
+
+### 验证
+
+- `pio test -e native`：当前 Windows 环境缺少 `gcc/g++`，native 测试未能启动，失败点是工具链不可用，不是断言失败。
+- `pio run -e s3_transmitter`：通过。
+- `pio run -e s3_transmitter -t upload --upload-port COM3`：通过，已写入 COM3 上的 ESP32-S3。

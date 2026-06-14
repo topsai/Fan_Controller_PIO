@@ -243,6 +243,15 @@ void test_s3_throttle_bar_keeps_center_and_uses_direction_colors() {
   TEST_ASSERT_EQUAL_UINT32(0x606060, s3ThrottleColorHex(0));
 }
 
+void test_s3_compass_angle_uses_qmc_heading_in_lvgl_tenths() {
+  TEST_ASSERT_EQUAL_INT16(0, s3CompassAngleForHeading(false, 180.0f));
+  TEST_ASSERT_EQUAL_INT16(0, s3CompassAngleForHeading(true, NAN));
+  TEST_ASSERT_EQUAL_INT16(0, s3CompassAngleForHeading(true, 0.0f));
+  TEST_ASSERT_EQUAL_INT16(905, s3CompassAngleForHeading(true, 90.49f));
+  TEST_ASSERT_EQUAL_INT16(10, s3CompassAngleForHeading(true, 361.0f));
+  TEST_ASSERT_EQUAL_INT16(3590, s3CompassAngleForHeading(true, -1.0f));
+}
+
 void test_s3_bmp280_altitude_uses_standard_sea_level_pressure() {
   TEST_ASSERT_FLOAT_WITHIN(0.1f, 0.0f, s3Bmp280AltitudeMeters(1013.25f));
   TEST_ASSERT_FLOAT_WITHIN(1.0f, 110.9f, s3Bmp280AltitudeMeters(1000.0f));
@@ -292,6 +301,7 @@ void setup() {
   RUN_TEST(test_s3_status_text_appends_lock_without_hiding_link_status);
   RUN_TEST(test_s3_voltage_arc_value_clamps_to_vesc_display_range);
   RUN_TEST(test_s3_throttle_bar_keeps_center_and_uses_direction_colors);
+  RUN_TEST(test_s3_compass_angle_uses_qmc_heading_in_lvgl_tenths);
   RUN_TEST(test_s3_bmp280_altitude_uses_standard_sea_level_pressure);
   RUN_TEST(test_s3_cw2015_reading_rejects_transient_zero_or_nan_values);
   RUN_TEST(test_s3_bmp280_reading_rejects_transient_zero_or_nan_values);

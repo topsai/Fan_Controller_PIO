@@ -65,6 +65,17 @@ inline uint32_t s3ThrottleColorHex(int16_t joystickValue) {
   return 0x606060;
 }
 
+inline int16_t s3CompassAngleForHeading(bool valid, float headingDeg) {
+  if (!valid || !isfinite(headingDeg)) {
+    return 0;
+  }
+  float normalized = fmodf(headingDeg, 360.0f);
+  if (normalized < 0.0f) {
+    normalized += 360.0f;
+  }
+  return (int16_t)(normalized * 10.0f + 0.5f);
+}
+
 inline float s3Bmp280AltitudeMeters(float pressureHpa) {
   if (isnan(pressureHpa) || pressureHpa <= 0.0f) {
     return NAN;

@@ -30,7 +30,7 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 | 油门/刹车进度 | Bar | `ui_BarThrottle` | `joystickValue` | `lv_bar_set_value()` + `lv_obj_set_style_bg_color()` |
 | 轮速 | Label | `ui_LabelSpeed` | `receiverSpeed` | `lv_label_set_text()` + `lv_obj_set_style_text_color()` |
 | BMP280 | Label | `ui_LabelBmp280` | `bmp280Valid/bmp280PressureHpa/bmp280AltitudeM` | `lv_label_set_text()` |
-| QMC5883L 航向 | Label | `ui_LabelHeading` | `qmcValid/qmcHeadingDeg` | `lv_label_set_text()` |
+| QMC5883L 航向 | Image | `ui_Compass` | `qmcValid/qmcHeadingDeg` | `lv_img_set_angle()` |
 | 按钮/RSSI | Label | `ui_LabelButtons` | `buttonState/rssiValue` | `lv_label_set_text()` |
 | FPS | Label | `ui_LabelFps` | `displayFps` | 待添加 SquareLine 控件后绑定 |
 | 触摸坐标 | Label | `ui_LabelTouch` | touch callback | 待添加 SquareLine 控件后绑定 |
@@ -49,6 +49,8 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 当前 SquareLine 导出的 VESC 电压控件是 `ui_ArcStatusVoltage` 和 `ui_LabelStatusVoltage`。Arc 范围固定为 `6-48V`，代码会把 `receiverVoltageX100` 四舍五入到整数伏并限制在该范围内；断联时 Arc 回到 `6V`，文字显示 `--.-V`。
 
 当前 SquareLine 导出的 BMP280 Label 实例名是 `ui_LabelBmp280`，显示格式为两行：第一行 `气压hPa`，第二行 `海拔m`。代码侧会强制设置白色、12px 字体和居中对齐，避免旧手写参数层删除后出现文字看不清或过长挤压。BMP280 的 `0`、`NaN`、越界气压/海拔会被判为不可信，短暂读取失败时继续显示最后一次可信值。海拔由标准海平面气压 `1013.25hPa` 估算，只适合显示趋势，不等同于精密校准海拔。
+
+当前 SquareLine 导出的指南针图片实例名是 `ui_Compass`。代码侧以图片中心为旋转轴，把 QMC5883L 的 `qmcHeadingDeg` 转换为 LVGL 图片角度单位（0.1 度）并实时调用 `lv_img_set_angle()`。QMC 数据无效时，指南针保持 0 度并降低透明度；QMC 数据有效时恢复不透明显示。
 
 旧版手写叠加参数层已经删除，包括标题、连接状态、档位/油门、速度、电池、BMP280、航向、按钮/RSSI、FPS、触摸坐标和占位 GPIO 提示。后续新增显示内容应优先在 SquareLine 创建控件，再在 `src/transmitter_s3/ui/ui.cpp` 里绑定数据。
 

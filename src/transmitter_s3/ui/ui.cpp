@@ -53,6 +53,10 @@ lv_obj_t *statusVoltageLabel() {
   return ui_LabelStatusVoltage;
 }
 
+lv_obj_t *compassImage() {
+  return ui_Compass;
+}
+
 lv_obj_t *createSettingsButton(lv_obj_t *parent, const char *text, int16_t x, int16_t y, int16_t w, int16_t h) {
   lv_obj_t *button = lv_btn_create(parent);
   lv_obj_set_size(button, w, h);
@@ -172,6 +176,13 @@ void s3_ui_init() {
     lv_label_set_text(statusVoltageLabel(), "--.-V");
   }
 
+  if (compassImage() != nullptr) {
+    lv_obj_update_layout(compassImage());
+    lv_img_set_pivot(compassImage(), lv_obj_get_width(compassImage()) / 2, lv_obj_get_height(compassImage()) / 2);
+    lv_img_set_angle(compassImage(), 0);
+    lv_obj_set_style_opa(compassImage(), LV_OPA_50, LV_PART_MAIN);
+  }
+
   createSettingsPanel();
 }
 
@@ -180,6 +191,7 @@ void s3_ui_update(const S3UiState &state) {
   const int16_t batteryPercent = s3BatteryPercentForArc(state.cw2015Valid, state.cw2015Soc);
   const int16_t throttleBarValue = s3ThrottleBarValue(state.joystickValue);
   const int16_t statusVoltageValue = s3StatusVoltageForArc(state.connected, state.receiverVoltageX100);
+  const int16_t compassAngle = s3CompassAngleForHeading(state.qmcValid, state.qmcHeadingDeg);
 
   s3FormatStatusText(buffer, sizeof(buffer), state.connected, state.armed);
   if (statusValueLabel() != nullptr) {
@@ -238,6 +250,11 @@ void s3_ui_update(const S3UiState &state) {
       snprintf(buffer, sizeof(buffer), "--.-V");
     }
     lv_label_set_text(statusVoltageLabel(), buffer);
+  }
+
+  if (compassImage() != nullptr) {
+    lv_img_set_angle(compassImage(), compassAngle);
+    lv_obj_set_style_opa(compassImage(), state.qmcValid ? LV_OPA_COVER : LV_OPA_50, LV_PART_MAIN);
   }
 
   s3_ui_set_settings_visible(state.settingsMode);

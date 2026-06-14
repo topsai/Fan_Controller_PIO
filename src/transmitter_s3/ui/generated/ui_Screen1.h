@@ -10,21 +10,23 @@
 extern "C" {
 #endif
 
+
 // SCREEN: ui_Screen1
 extern void ui_Screen1_screen_init(void);
 extern void ui_Screen1_screen_destroy(void);
-extern lv_obj_t * ui_Screen1;
-extern lv_obj_t * ui_bg_1;
-extern lv_obj_t * ui_ArcBattery;
-extern lv_obj_t * ui_LabelBattery;
-extern lv_obj_t * ui_LabelSpeed;
-extern lv_obj_t * ui_kmh;
-extern lv_obj_t * ui_LabelStatus;
-extern lv_obj_t * ui_LabelControl;
-extern lv_obj_t * ui_LabelBmp280;
-extern lv_obj_t * ui_BarThrottle;
-extern lv_obj_t * ui_ArcStatusVoltage;
-extern lv_obj_t * ui_LabelStatusVoltage;
+extern lv_obj_t *ui_Screen1;
+extern lv_obj_t *ui_bg_1;
+extern lv_obj_t *ui_ArcBattery;
+extern lv_obj_t *ui_LabelBattery;
+extern lv_obj_t *ui_LabelSpeed;
+extern lv_obj_t *ui_kmh;
+extern lv_obj_t *ui_LabelStatus;
+extern lv_obj_t *ui_LabelControl;
+extern lv_obj_t *ui_LabelBmp280;
+extern lv_obj_t *ui_BarThrottle;
+extern lv_obj_t *ui_ArcStatusVoltage;
+extern lv_obj_t *ui_LabelStatusVoltage;
+extern lv_obj_t *ui_Compass;
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus

@@ -6,7 +6,7 @@
 #include "ui.h"
 
 #ifndef LV_ATTRIBUTE_MEM_ALIGN
-    #define LV_ATTRIBUTE_MEM_ALIGN
+#define LV_ATTRIBUTE_MEM_ALIGN
 #endif
 
 // IMAGE DATA: assets/bg3.png
@@ -19715,13 +19715,12 @@ const LV_ATTRIBUTE_MEM_ALIGN uint8_t ui_img_bg3_png_data[] = {
     0x00,0x00,
 };
 const lv_img_dsc_t ui_img_bg3_png = {
-    .header.always_zero = 0,
-    .header.w = 397,
-    .header.h = 397,
-    .data_size = sizeof(ui_img_bg3_png_data),
-    .header.cf = LV_IMG_CF_TRUE_COLOR,
-    .data = ui_img_bg3_png_data
-};
+   .header.always_zero = 0,
+   .header.w = 397,
+   .header.h = 397,
+   .data_size = sizeof(ui_img_bg3_png_data),
+   .header.cf = LV_IMG_CF_TRUE_COLOR,
+   .data = ui_img_bg3_png_data};
 
 
 // patch_squareline_export: byte-swapped for LV_COLOR_16_SWAP=1
