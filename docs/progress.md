@@ -1327,6 +1327,47 @@ S3 页面上的本机电量和 BMP280 气压/海拔偶发变成 `0` 或无效显
 
 - 本轮仅新增文档，未改固件代码。
 
+## 2026-06-15 SquareLine Screen 和组件补齐
+
+### 目标
+
+用户反馈 S3 新增 Screen 和组件数量较多，希望直接把 Screen 和对象加入 SquareLine 工程，减少手工操作。
+
+### 已完成
+
+- 直接更新 `tools/ui_projects/s3_transmitter_squareline/s3_transmitter_squareline.spj`。
+- 保留现有主屏 `Screen1`，避免重新导出后无谓改动主屏变量。
+- 补全已有 `ScreenDiag`，新增诊断组件：
+  - `LabelLinkDiag`
+  - `LabelRxFlags`
+  - `LabelProtocol`
+  - `LabelSeq`
+  - `LabelVesc`
+  - `LabelSensors`
+- 新增 `ScreenCal`，包含校准组件：
+  - `LabelJoyCenter`
+  - `LabelJoyRaw`
+  - `LabelJoyOut`
+  - `LabelJoyRange`
+  - `LabelSpeedAdc`
+  - `ButtonJoyMinus`
+  - `ButtonJoyCal`
+  - `ButtonJoyPlus`
+  - `ButtonJoyReset`
+- 新增 `ScreenSystem`，包含系统组件：
+  - `LabelFirmware`
+  - `LabelBrightness`
+  - `SliderBrightness`
+  - `LabelPowerMode`
+  - `LabelUpgrade`
+- 更新 `docs/s3-ui-final-components.md` 和 `docs/ui-field-reference.md`，明确当前主屏仍为 `Screen1`。
+
+### 验证
+
+- `s3_transmitter_squareline.spj` 可以被 JSON 正常解析。
+- 自动校验确认目标 Screen/对象全部存在，类型为 `SCREEN`、`LABEL`、`BUTTON`、`SLIDER`，且无重名。
+- Windows Computer Use 插件初始化失败，未能自动截图验证 SquareLine 界面；需要在 SquareLine 中打开工程做一次目视确认。
+
 ### 未执行
 
 - 30 分钟稳定性测试未执行；按规则只在显式 `--long` 时运行。
