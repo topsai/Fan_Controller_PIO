@@ -203,10 +203,17 @@ void s3_ui_update(const S3UiState &state) {
   const int16_t statusVoltageValue = s3StatusVoltageForArc(state.connected, state.receiverVoltageX100);
   const int16_t compassAngle = s3CompassAngleForHeading(state.qmcValid, state.qmcHeadingDeg);
 
-  s3FormatStatusText(buffer, sizeof(buffer), state.connected, state.armed);
+  if (state.connected && (state.receiverStatusFlags & STATUS_FLAG_FAILSAFE) != 0) {
+    snprintf(buffer, sizeof(buffer), "RX FS");
+  } else if (state.connected && (state.receiverStatusFlags & STATUS_FLAG_PROTOCOL_FAULT) != 0) {
+    snprintf(buffer, sizeof(buffer), "PROTO");
+  } else {
+    s3FormatStatusText(buffer, sizeof(buffer), state.connected, state.armed);
+  }
   if (statusValueLabel() != nullptr) {
     lv_label_set_text(statusValueLabel(), buffer);
-    const uint32_t color = !state.armed ? 0xFFD23F : (state.connected ? 0x00D86A : 0xFF4040);
+    const bool receiverFault = (state.receiverStatusFlags & (STATUS_FLAG_FAILSAFE | STATUS_FLAG_PROTOCOL_FAULT)) != 0;
+    const uint32_t color = receiverFault ? 0xFF4040 : (!state.armed ? 0xFFD23F : (state.connected ? 0x00D86A : 0xFF4040));
     lv_obj_set_style_text_color(statusValueLabel(), lv_color_hex(color), LV_PART_MAIN);
   }
 
@@ -270,6 +277,9 @@ void s3_ui_update(const S3UiState &state) {
   if (mcuTemperatureLabel() != nullptr) {
     s3FormatMcuTemperatureText(buffer, sizeof(buffer), state.mcuTemperatureC);
     lv_label_set_text(mcuTemperatureLabel(), buffer);
+    lv_obj_set_style_text_color(mcuTemperatureLabel(),
+                                state.mcuTemperatureWarning ? lv_color_hex(0xFF4040) : lv_color_white(),
+                                LV_PART_MAIN);
   }
 
   s3_ui_set_settings_visible(state.settingsMode);

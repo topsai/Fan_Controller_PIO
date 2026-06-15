@@ -17,6 +17,8 @@
 #include <Adafruit_SSD1306.h>
 #include "beep_profiles.h"
 #include "control_logic.h"
+#include "diagnostic_protocol.h"
+#include "protocol.h"
 
 // ========== 引脚定义 ==========
 #define SWITCH_PIN_1 6   // 三档开关档位1
@@ -73,22 +75,27 @@ bool lowBatteryWarned = false;
 typedef struct {
   uint8_t head;        // 帧头 0xA5
   uint8_t type;        // 0x01=控制数据
+  uint8_t version;
+  uint16_t sequence;
   int16_t throttle;    // 油门/刹车 (-1000~1000，回中=0)
   uint8_t speedLevel;  // 速度档位 1/2/3
   uint8_t buttons;     // 按钮状态 bit0=按钮1, bit1=按钮2
-  uint8_t checksum;    // 校验和
-} ControlPacket;       // 8字节
+  uint8_t flags;
+  uint8_t crc;
+} ControlPacket;
 
 typedef struct {
   uint8_t head;         // 帧头 0x5A
   uint8_t type;         // 0x02=状态数据
+  uint8_t version;
+  uint16_t sequence;
   int16_t rssi;         // 信号强度
   uint16_t voltage;     // 电池电压(x100)
   uint8_t motorPWM[4];  // 电机PWM值
   uint16_t speed;       //速度值（如km/h×10或RPM）
   uint8_t status;       // 状态标志
-  uint8_t checksum;     // 校验和
-} StatusPacket;         // 10字节
+  uint8_t crc;
+} StatusPacket;
 
 #pragma pack(pop)
 
@@ -130,6 +137,13 @@ volatile uint32_t lastRecvTime = 0;
 volatile int16_t rssiValue = -100;
 volatile uint16_t voltageValue = 0;
 volatile uint16_t speedValue = 0;  // ← 新增：存储回传速度
+uint16_t controlSequence = 0;
+uint16_t lastStatusSequence = 0;
+bool hasStatusSequence = false;
+volatile uint8_t receiverStatusFlags = 0;
+uint32_t diagnosticStatusPackets = 0;
+uint32_t diagnosticLostPackets = 0;
+uint32_t diagnosticFaultCount = 0;
 
 // ========== 硬件定时器中断 ==========
 void IRAM_ATTR onControlTimer() {
@@ -340,23 +354,17 @@ void alarmBeep() {
   }
 }
 
-// ========== 数据发送 ==========
-uint8_t calcChecksum(uint8_t *data, uint8_t len) {
-  uint8_t sum = 0;
-  for (uint8_t i = 0; i < len - 1; i++) {
-    sum += data[i];
-  }
-  return sum;
-}
-
 void sendControlData() {
-  ControlPacket pkt;
-  pkt.head = 0xA5;
-  pkt.type = 0x01;
+  ControlPacket pkt = {};
+  pkt.head = CONTROL_PACKET_HEAD;
+  pkt.type = CONTROL_PACKET_TYPE;
+  pkt.version = CONTROL_PROTOCOL_VERSION;
+  pkt.sequence = controlSequence++;
   pkt.throttle = joystickValue;
   pkt.speedLevel = speedLevel;
   pkt.buttons = buttonState;
-  pkt.checksum = calcChecksum((uint8_t *)&pkt, sizeof(pkt));
+  pkt.flags = transmitterArmed ? 0 : STATUS_FLAG_OUTPUT_LOCKED;
+  pkt.crc = protocolCrc8((const uint8_t *)&pkt, sizeof(pkt) - 1);
 
   // 非阻塞发送
   esp_err_t result = esp_now_send(receiverMac, (uint8_t *)&pkt, sizeof(pkt));
@@ -378,17 +386,87 @@ void onDataRecv(const uint8_t *mac, const uint8_t *data, int len) {
     StatusPacket *pkt = (StatusPacket *)data;
 
     // 验证帧头和类型
-    if (pkt->head != 0x5A || pkt->type != 0x02) return;
+    if (pkt->head != STATUS_PACKET_HEAD || pkt->type != STATUS_PACKET_TYPE || pkt->version != STATUS_PROTOCOL_VERSION) return;
 
-    // 校验和验证
-    if (calcChecksum((uint8_t *)pkt, sizeof(StatusPacket)) != pkt->checksum) return;
+    if (protocolCrc8((const uint8_t *)pkt, sizeof(StatusPacket) - 1) != pkt->crc) return;
+    if (!protocolSequenceIsFresh(pkt->sequence, lastStatusSequence, hasStatusSequence)) return;
+    protocolRememberSequence(pkt->sequence, lastStatusSequence, hasStatusSequence);
 
     // 更新状态
     rssiValue = pkt->rssi;
     voltageValue = pkt->voltage;
     speedValue = pkt->speed;  // 保存速度
+    receiverStatusFlags = pkt->status;
     lastRecvTime = millis();
     connected = true;
+    diagnosticStatusPackets++;
+  }
+}
+
+void printDiagnosticStatus() {
+  char line[96] = {};
+  diagnosticFormatStatusLine(line,
+                             sizeof(line),
+                             "transmitter",
+                             connected,
+                             diagnosticStatusPackets,
+                             diagnosticLostPackets,
+                             diagnosticFaultCount);
+  Serial.println(line);
+}
+
+void handleDiagnosticCommand(const String &line) {
+  if (line == "DIAG PING") {
+    Serial.println("DIAG PONG role=transmitter protocol=2");
+    return;
+  }
+  if (line == "DIAG STATUS") {
+    printDiagnosticStatus();
+    return;
+  }
+  if (line.startsWith("DIAG SIMSTATUS ")) {
+    int rssi = -60;
+    int voltage = 4800;
+    int speed = 0;
+    int status = 0;
+    if (sscanf(line.c_str(), "DIAG SIMSTATUS %d %d %d %d", &rssi, &voltage, &speed, &status) != 4) {
+      Serial.println("DIAG ERR simstatus");
+      diagnosticFaultCount++;
+      return;
+    }
+    rssiValue = (int16_t)rssi;
+    voltageValue = (uint16_t)clampInt(voltage, 0, 65535);
+    speedValue = (uint16_t)clampInt(speed, 0, 65535);
+    receiverStatusFlags = (uint8_t)clampInt(status, 0, 255);
+    lastRecvTime = millis();
+    connected = true;
+    diagnosticStatusPackets++;
+    Serial.println("DIAG OK simstatus");
+    return;
+  }
+  if (line.length() > 0) {
+    Serial.println("DIAG ERR unknown");
+    diagnosticFaultCount++;
+  }
+}
+
+void updateDiagnosticSerial() {
+  static String line;
+  while (Serial.available() > 0) {
+    const char c = (char)Serial.read();
+    if (c == '\r') {
+      continue;
+    }
+    if (c == '\n') {
+      handleDiagnosticCommand(line);
+      line = "";
+    } else if (line.length() < 96) {
+      line += c;
+    } else {
+      line = "";
+      diagnosticFaultCount++;
+      Serial.println("DIAG ERR overflow");
+    }
   }
 }
 
@@ -557,6 +635,7 @@ void setup() {
 }
 
 void loop() {
+  updateDiagnosticSerial();
   // 1. 读取所有输入（每次循环都读，保证实时性）
   readJoystick();
   readSwitches();

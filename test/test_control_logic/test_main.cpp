@@ -1,6 +1,8 @@
 #include <unity.h>
 #include "control_logic.h"
 #include "beep_profiles.h"
+#include "protocol.h"
+#include "diagnostic_protocol.h"
 #include "s3_runtime_config.h"
 #include "s3_ui_bindings.h"
 
@@ -35,6 +37,33 @@ void test_joystick_mapping_uses_calibrated_center_and_deadzone() {
 void test_joystick_center_calibration_averages_samples() {
   const int samples[] = {2098, 2100, 2102, 2100};
   TEST_ASSERT_EQUAL_INT(2100, calibratedJoystickCenter(samples, 4, 2048));
+}
+
+void test_joystick_calibration_rejects_invalid_persisted_values() {
+  JoystickCalibration calibration = {2048, 0, 4095, 50};
+  TEST_ASSERT_TRUE(joystickCalibrationIsValid(calibration));
+
+  calibration.center = 0;
+  TEST_ASSERT_FALSE(joystickCalibrationIsValid(calibration));
+
+  calibration.center = 2048;
+  calibration.minRaw = 2100;
+  calibration.maxRaw = 2000;
+  TEST_ASSERT_FALSE(joystickCalibrationIsValid(calibration));
+
+  calibration.minRaw = 0;
+  calibration.maxRaw = 4095;
+  calibration.deadzone = 900;
+  TEST_ASSERT_FALSE(joystickCalibrationIsValid(calibration));
+}
+
+void test_joystick_calibrated_mapping_uses_persisted_range() {
+  const JoystickCalibration calibration = {2100, 100, 3900, 60};
+  TEST_ASSERT_EQUAL_INT(0, joystickToThrottleCalibrated(2130, calibration));
+  TEST_ASSERT_TRUE(joystickToThrottleCalibrated(3900, calibration) > 980);
+  TEST_ASSERT_TRUE(joystickToThrottleCalibrated(100, calibration) < -980);
+  TEST_ASSERT_EQUAL_INT(1000, joystickToThrottleCalibrated(4095, calibration));
+  TEST_ASSERT_EQUAL_INT(-1000, joystickToThrottleCalibrated(0, calibration));
 }
 
 void test_transmitter_safety_forces_zero_until_armed() {
@@ -190,6 +219,64 @@ void test_receiver_status_target_tracks_last_valid_transmitter() {
   TEST_ASSERT_EQUAL_UINT8_ARRAY(s3Mac, statusTarget, 6);
 }
 
+void test_protocol_crc8_detects_packet_changes() {
+  const uint8_t payload[] = {0xA5, 0x01, CONTROL_PROTOCOL_VERSION, 0x34, 0x12, 0x00};
+  const uint8_t crc = protocolCrc8(payload, sizeof(payload));
+  TEST_ASSERT_NOT_EQUAL_UINT8(0, crc);
+
+  uint8_t changed[sizeof(payload)] = {};
+  memcpy(changed, payload, sizeof(payload));
+  changed[4] ^= 0x01;
+  TEST_ASSERT_NOT_EQUAL_UINT8(crc, protocolCrc8(changed, sizeof(changed)));
+}
+
+void test_protocol_sequence_accepts_fresh_values_and_rejects_stale_replays() {
+  uint16_t lastSeq = 0;
+  bool hasSeq = false;
+
+  TEST_ASSERT_TRUE(protocolSequenceIsFresh(10, lastSeq, hasSeq));
+  protocolRememberSequence(10, lastSeq, hasSeq);
+  TEST_ASSERT_TRUE(hasSeq);
+  TEST_ASSERT_EQUAL_UINT16(10, lastSeq);
+  TEST_ASSERT_FALSE(protocolSequenceIsFresh(10, lastSeq, hasSeq));
+  TEST_ASSERT_FALSE(protocolSequenceIsFresh(9, lastSeq, hasSeq));
+  TEST_ASSERT_TRUE(protocolSequenceIsFresh(11, lastSeq, hasSeq));
+  TEST_ASSERT_TRUE(protocolSequenceIsFresh(0, 65535, true));
+}
+
+void test_protocol_status_flags_are_composable() {
+  uint8_t flags = 0;
+  flags |= STATUS_FLAG_FAILSAFE;
+  flags |= STATUS_FLAG_VESC_VALID;
+  TEST_ASSERT_TRUE((flags & STATUS_FLAG_FAILSAFE) != 0);
+  TEST_ASSERT_TRUE((flags & STATUS_FLAG_VESC_VALID) != 0);
+  TEST_ASSERT_FALSE((flags & STATUS_FLAG_PROTOCOL_FAULT) != 0);
+}
+
+void test_protocol_legacy_checksum_keeps_v1_packets_migratable() {
+  const uint8_t legacyControl[] = {0xA5, 0x01, 0x00, 0x00, 0x01, 0x00, 0xA7};
+  TEST_ASSERT_EQUAL_UINT8(7, LEGACY_CONTROL_PACKET_SIZE);
+  TEST_ASSERT_EQUAL_UINT8(14, LEGACY_STATUS_PACKET_SIZE);
+  TEST_ASSERT_TRUE(protocolLegacyChecksumIsValid(legacyControl, sizeof(legacyControl)));
+
+  uint8_t changed[sizeof(legacyControl)] = {};
+  memcpy(changed, legacyControl, sizeof(legacyControl));
+  changed[4] = 0x02;
+  TEST_ASSERT_FALSE(protocolLegacyChecksumIsValid(changed, sizeof(changed)));
+}
+
+void test_diagnostic_duration_requires_explicit_long_flag_for_30_minutes() {
+  TEST_ASSERT_TRUE(diagnosticDurationIsAllowed(10000, false));
+  TEST_ASSERT_FALSE(diagnosticDurationIsAllowed(DIAGNOSTIC_LONG_TEST_MS, false));
+  TEST_ASSERT_TRUE(diagnosticDurationIsAllowed(DIAGNOSTIC_LONG_TEST_MS, true));
+}
+
+void test_diagnostic_status_line_includes_role_and_counters() {
+  char buffer[96] = {};
+  diagnosticFormatStatusLine(buffer, sizeof(buffer), "receiver", true, 125, 0, 3);
+  TEST_ASSERT_EQUAL_STRING("DIAG STATUS role=receiver connected=1 rx=125 lost=0 faults=3", buffer);
+}
+
 void test_s3_battery_arc_value_clamps_and_rounds_soc() {
   TEST_ASSERT_EQUAL_INT16(0, s3BatteryPercentForArc(false, 80.0f));
   TEST_ASSERT_EQUAL_INT16(0, s3BatteryPercentForArc(true, -4.0f));
@@ -257,6 +344,28 @@ void test_s3_mcu_temperature_formats_one_decimal_or_placeholder() {
   TEST_ASSERT_EQUAL_STRING("--.-C", buffer);
 }
 
+void test_s3_diagnostic_text_formats_link_quality() {
+  char buffer[32] = {};
+  s3FormatLinkDiagnosticText(buffer, sizeof(buffer), -62, 48, 3);
+  TEST_ASSERT_EQUAL_STRING("RSSI -62 PKT 48 LOSS 3", buffer);
+}
+
+void test_s3_receiver_status_text_decodes_flags() {
+  char buffer[48] = {};
+  s3FormatReceiverStatusFlags(buffer, sizeof(buffer), STATUS_FLAG_FAILSAFE | STATUS_FLAG_PROTOCOL_FAULT);
+  TEST_ASSERT_EQUAL_STRING("FS PROTO", buffer);
+
+  s3FormatReceiverStatusFlags(buffer, sizeof(buffer), STATUS_FLAG_VESC_VALID | STATUS_FLAG_OUTPUT_LOCKED);
+  TEST_ASSERT_EQUAL_STRING("VESC LOCK", buffer);
+}
+
+void test_s3_mcu_temperature_warning_threshold() {
+  TEST_ASSERT_FALSE(s3McuTemperatureWarns(false, 90.0f, 75.0f));
+  TEST_ASSERT_FALSE(s3McuTemperatureWarns(true, NAN, 75.0f));
+  TEST_ASSERT_FALSE(s3McuTemperatureWarns(true, 74.9f, 75.0f));
+  TEST_ASSERT_TRUE(s3McuTemperatureWarns(true, 75.0f, 75.0f));
+}
+
 void test_s3_bmp280_altitude_uses_standard_sea_level_pressure() {
   TEST_ASSERT_FLOAT_WITHIN(0.1f, 0.0f, s3Bmp280AltitudeMeters(1013.25f));
   TEST_ASSERT_FLOAT_WITHIN(1.0f, 110.9f, s3Bmp280AltitudeMeters(1000.0f));
@@ -285,6 +394,8 @@ void setup() {
   RUN_TEST(test_pwm_mapping_defaults_invalid_speed_level_to_level_1);
   RUN_TEST(test_joystick_mapping_uses_calibrated_center_and_deadzone);
   RUN_TEST(test_joystick_center_calibration_averages_samples);
+  RUN_TEST(test_joystick_calibration_rejects_invalid_persisted_values);
+  RUN_TEST(test_joystick_calibrated_mapping_uses_persisted_range);
   RUN_TEST(test_transmitter_safety_forces_zero_until_armed);
   RUN_TEST(test_transmitter_arming_requires_full_brake_hold_for_three_seconds);
   RUN_TEST(test_transmitter_brake_hold_resets_when_brake_released);
@@ -300,6 +411,12 @@ void setup() {
   RUN_TEST(test_s3_lvgl_display_dma_is_enabled);
   RUN_TEST(test_s3_espnow_link_uses_stable_radio_profile);
   RUN_TEST(test_receiver_status_target_tracks_last_valid_transmitter);
+  RUN_TEST(test_protocol_crc8_detects_packet_changes);
+  RUN_TEST(test_protocol_sequence_accepts_fresh_values_and_rejects_stale_replays);
+  RUN_TEST(test_protocol_status_flags_are_composable);
+  RUN_TEST(test_protocol_legacy_checksum_keeps_v1_packets_migratable);
+  RUN_TEST(test_diagnostic_duration_requires_explicit_long_flag_for_30_minutes);
+  RUN_TEST(test_diagnostic_status_line_includes_role_and_counters);
   RUN_TEST(test_s3_battery_arc_value_clamps_and_rounds_soc);
   RUN_TEST(test_s3_speed_label_color_uses_speed_bands);
   RUN_TEST(test_s3_status_text_appends_lock_without_hiding_link_status);
@@ -307,6 +424,9 @@ void setup() {
   RUN_TEST(test_s3_throttle_bar_keeps_center_and_uses_direction_colors);
   RUN_TEST(test_s3_compass_angle_uses_qmc_heading_in_lvgl_tenths);
   RUN_TEST(test_s3_mcu_temperature_formats_one_decimal_or_placeholder);
+  RUN_TEST(test_s3_diagnostic_text_formats_link_quality);
+  RUN_TEST(test_s3_receiver_status_text_decodes_flags);
+  RUN_TEST(test_s3_mcu_temperature_warning_threshold);
   RUN_TEST(test_s3_bmp280_altitude_uses_standard_sea_level_pressure);
   RUN_TEST(test_s3_cw2015_reading_rejects_transient_zero_or_nan_values);
   RUN_TEST(test_s3_bmp280_reading_rejects_transient_zero_or_nan_values);

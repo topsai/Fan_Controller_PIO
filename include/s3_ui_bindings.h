@@ -4,8 +4,10 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "control_logic.h"
+#include "protocol.h"
 
 inline int16_t s3BatteryPercentForArc(bool valid, float socPercent) {
   if (!valid || isnan(socPercent)) {
@@ -85,6 +87,45 @@ inline void s3FormatMcuTemperatureText(char *buffer, size_t bufferSize, float te
     return;
   }
   snprintf(buffer, bufferSize, "%.1fC", temperatureC);
+}
+
+inline bool s3McuTemperatureWarns(bool valid, float temperatureC, float warnThresholdC) {
+  return valid && isfinite(temperatureC) && temperatureC >= warnThresholdC;
+}
+
+inline void s3FormatLinkDiagnosticText(char *buffer, size_t bufferSize, int16_t rssi, uint16_t packetRateHz, uint16_t lostPackets) {
+  if (bufferSize == 0) {
+    return;
+  }
+  snprintf(buffer, bufferSize, "RSSI %d PKT %u LOSS %u", rssi, packetRateHz, lostPackets);
+}
+
+inline void s3FormatReceiverStatusFlags(char *buffer, size_t bufferSize, uint8_t flags) {
+  if (bufferSize == 0) {
+    return;
+  }
+  if (flags == 0) {
+    snprintf(buffer, bufferSize, "OK");
+    return;
+  }
+  char text[48] = {};
+  bool wrote = false;
+  if ((flags & STATUS_FLAG_FAILSAFE) != 0) {
+    snprintf(text + strlen(text), sizeof(text) - strlen(text), "%sFS", wrote ? " " : "");
+    wrote = true;
+  }
+  if ((flags & STATUS_FLAG_PROTOCOL_FAULT) != 0) {
+    snprintf(text + strlen(text), sizeof(text) - strlen(text), "%sPROTO", wrote ? " " : "");
+    wrote = true;
+  }
+  if ((flags & STATUS_FLAG_VESC_VALID) != 0) {
+    snprintf(text + strlen(text), sizeof(text) - strlen(text), "%sVESC", wrote ? " " : "");
+    wrote = true;
+  }
+  if ((flags & STATUS_FLAG_OUTPUT_LOCKED) != 0) {
+    snprintf(text + strlen(text), sizeof(text) - strlen(text), "%sLOCK", wrote ? " " : "");
+  }
+  snprintf(buffer, bufferSize, "%s", text);
 }
 
 inline float s3Bmp280AltitudeMeters(float pressureHpa) {

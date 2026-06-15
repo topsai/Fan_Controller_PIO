@@ -17,6 +17,12 @@ struct S3UiState {
   bool qmcValid = false;
   float qmcHeadingDeg = NAN;
   float mcuTemperatureC = NAN;
+  bool mcuTemperatureWarning = false;
+  int16_t rssiValue = -100;
+  uint8_t receiverStatusFlags = 0;
+  uint16_t statusPacketRateHz = 0;
+  uint16_t statusLostPackets = 0;
+  uint8_t displayBrightness = 0;
   bool armed = false;
   bool settingsMode = false;
   int joystickCenter = 2048;

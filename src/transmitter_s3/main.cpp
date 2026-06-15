@@ -5,9 +5,12 @@
 #include <WiFi.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
+#include <Preferences.h>
 #include <math.h>
 #include "beep_profiles.h"
 #include "control_logic.h"
+#include "diagnostic_protocol.h"
+#include "protocol.h"
 #include "s3_runtime_config.h"
 #include "s3_ui_bindings.h"
 #include "ui/ui.h"
@@ -46,8 +49,16 @@ constexpr uint8_t LOCAL_SENSOR_INVALIDATE_AFTER_FAILURES = 6;
 constexpr uint16_t CONNECTION_TIMEOUT_MS = S3_ESPNOW_STATUS_TIMEOUT_MS;
 constexpr uint8_t ESPNOW_CHANNEL = 1;
 constexpr uint8_t LCD_BRIGHTNESS = 140;
+constexpr uint8_t LCD_DIM_BRIGHTNESS = 45;
+constexpr uint32_t DISPLAY_DIM_AFTER_MS = 30000;
+constexpr float MCU_TEMPERATURE_WARN_C = 75.0f;
 constexpr int JOYSTICK_DEADZONE = 50;
 constexpr int ADC_CENTER = 2048;
+constexpr const char *CALIBRATION_NAMESPACE = "joy_cal";
+constexpr const char *CALIBRATION_CENTER_KEY = "center";
+constexpr const char *CALIBRATION_MIN_KEY = "min";
+constexpr const char *CALIBRATION_MAX_KEY = "max";
+constexpr const char *CALIBRATION_DEADZONE_KEY = "deadzone";
 constexpr int ARM_BRAKE_THRESHOLD = -900;
 constexpr uint32_t ARM_BRAKE_HOLD_MS = 3000;
 constexpr int THROTTLE_SLEW_STEP = 40;
@@ -69,21 +80,26 @@ constexpr wifi_power_t S3_ESPNOW_TX_POWER = WIFI_POWER_2dBm;
 struct ControlPacket {
   uint8_t head;
   uint8_t type;
+  uint8_t version;
+  uint16_t sequence;
   int16_t throttle;
   uint8_t speedLevel;
   uint8_t buttons;
-  uint8_t checksum;
+  uint8_t flags;
+  uint8_t crc;
 };
 
 struct StatusPacket {
   uint8_t head;
   uint8_t type;
+  uint8_t version;
+  uint16_t sequence;
   int16_t rssi;
   uint16_t voltage;
   uint8_t motorPWM[4];
   uint16_t speed;
   uint8_t status;
-  uint8_t checksum;
+  uint8_t crc;
 };
 #pragma pack(pop)
 
@@ -215,6 +231,7 @@ struct Qmc5883lData {
 };
 
 S3RoundDisplay display;
+Preferences preferences;
 constexpr uint16_t LCD_WIDTH = 240;
 constexpr uint16_t LCD_HEIGHT = 240;
 constexpr uint16_t LVGL_BUFFER_LINES = 40;
@@ -232,6 +249,7 @@ bool auxI2cFound[128] = {};
 uint8_t receiverMac[] = {0xAC, 0xEB, 0xE6, 0x44, 0xC5, 0x90};
 
 int joystickCenter = ADC_CENTER;
+JoystickCalibration joystickCalibration = {ADC_CENTER, 0, 4095, JOYSTICK_DEADZONE};
 int16_t joystickRawValue = 0;
 int16_t joystickValue = 0;
 uint8_t speedLevel = 1;
@@ -247,23 +265,27 @@ uint32_t lastRecvTime = 0;
 int16_t rssiValue = -100;
 uint16_t receiverVoltageX100 = 0;
 uint16_t receiverSpeed = 0;
+uint8_t receiverStatusFlags = 0;
+uint16_t controlSequence = 0;
+uint16_t lastStatusSequence = 0;
+bool hasStatusSequence = false;
+uint32_t statusPacketCounter = 0;
+uint32_t lastStatusRateSampleMs = 0;
+uint16_t statusPacketRateHz = 0;
+uint16_t statusLostPackets = 0;
+uint32_t diagnosticStatusPackets = 0;
+uint32_t diagnosticFaultCount = 0;
 bool lowBatteryWarned = false;
 uint32_t lastDisplayMs = 0;
 uint32_t lastLocalSensorMs = 0;
 uint32_t lastDebugMs = 0;
 uint32_t lastLinkAlertMs = 0;
 uint32_t lastLvglHandlerMs = 0;
+uint32_t lastUserActivityMs = 0;
+uint8_t currentBrightness = LCD_BRIGHTNESS;
 TaskHandle_t controlTaskHandle = nullptr;
 
 void startControlSendTask();
-
-uint8_t calcChecksum(const uint8_t *data, uint8_t len) {
-  uint8_t sum = 0;
-  for (uint8_t i = 0; i < len - 1; i++) {
-    sum += data[i];
-  }
-  return sum;
-}
 
 uint16_t mapTouchX(uint16_t rawX) {
   return 239 - rawX;
@@ -312,6 +334,60 @@ int16_t s16le(const uint8_t *p) {
 
 void beep(uint16_t frequencyHz, uint16_t durationMs) {
   tone(BUZZER_PIN, frequencyHz, durationMs);
+}
+
+void markUserActivity() {
+  lastUserActivityMs = millis();
+  if (currentBrightness != LCD_BRIGHTNESS) {
+    currentBrightness = LCD_BRIGHTNESS;
+    display.setBrightness(currentBrightness);
+  }
+}
+
+void updateDisplayPower() {
+  if (settingsMode || millis() - lastUserActivityMs < DISPLAY_DIM_AFTER_MS) {
+    return;
+  }
+  if (currentBrightness != LCD_DIM_BRIGHTNESS) {
+    currentBrightness = LCD_DIM_BRIGHTNESS;
+    display.setBrightness(currentBrightness);
+  }
+}
+
+void saveJoystickCalibration() {
+  preferences.begin(CALIBRATION_NAMESPACE, false);
+  preferences.putInt(CALIBRATION_CENTER_KEY, joystickCalibration.center);
+  preferences.putInt(CALIBRATION_MIN_KEY, joystickCalibration.minRaw);
+  preferences.putInt(CALIBRATION_MAX_KEY, joystickCalibration.maxRaw);
+  preferences.putInt(CALIBRATION_DEADZONE_KEY, joystickCalibration.deadzone);
+  preferences.end();
+  Serial.printf("S3 joystick calibration saved: center=%d min=%d max=%d deadzone=%d\n",
+                joystickCalibration.center,
+                joystickCalibration.minRaw,
+                joystickCalibration.maxRaw,
+                joystickCalibration.deadzone);
+}
+
+bool loadJoystickCalibration() {
+  preferences.begin(CALIBRATION_NAMESPACE, true);
+  JoystickCalibration stored = {
+    preferences.getInt(CALIBRATION_CENTER_KEY, ADC_CENTER),
+    preferences.getInt(CALIBRATION_MIN_KEY, 0),
+    preferences.getInt(CALIBRATION_MAX_KEY, 4095),
+    preferences.getInt(CALIBRATION_DEADZONE_KEY, JOYSTICK_DEADZONE),
+  };
+  preferences.end();
+  if (!joystickCalibrationIsValid(stored)) {
+    return false;
+  }
+  joystickCalibration = stored;
+  joystickCenter = stored.center;
+  Serial.printf("S3 joystick calibration loaded: center=%d min=%d max=%d deadzone=%d\n",
+                stored.center,
+                stored.minRaw,
+                stored.maxRaw,
+                stored.deadzone);
+  return true;
 }
 
 void scanAuxI2c() {
@@ -520,11 +596,19 @@ void calibrateJoystickCenter() {
     delay(2);
   }
   joystickCenter = calibratedJoystickCenter(samples, sampleCount, ADC_CENTER);
+  joystickCalibration.center = joystickCenter;
+  joystickCalibration.minRaw = 0;
+  joystickCalibration.maxRaw = 4095;
+  joystickCalibration.deadzone = JOYSTICK_DEADZONE;
   Serial.printf("S3 joystick center: %d\n", joystickCenter);
+  saveJoystickCalibration();
 }
 
 void readInputs() {
-  const int16_t targetThrottle = joystickToThrottle(analogRead(JOYSTICK_PIN), joystickCenter, JOYSTICK_DEADZONE);
+  const int16_t targetThrottle = joystickToThrottleCalibrated(analogRead(JOYSTICK_PIN), joystickCalibration);
+  if (abs(targetThrottle) > JOYSTICK_DEADZONE) {
+    markUserActivity();
+  }
   joystickRawValue = targetThrottle;
   if (!settingsMode && !transmitterArmed &&
       shouldArmByBrakeHold(targetThrottle, millis(), armBrakeHoldStartMs, armBrakeHolding,
@@ -556,6 +640,7 @@ void readInputs() {
   static bool lastButton1Down = false;
   if (button1Down && !lastButton1Down) {
     settingsMode = !settingsMode;
+    markUserActivity();
     transmitterArmed = false;
     armBrakeHolding = false;
     joystickValue = 0;
@@ -564,6 +649,7 @@ void readInputs() {
   lastButton1Down = button1Down;
 
   if ((nextButtons & ~lastButtons) != 0 && !settingsMode) {
+    markUserActivity();
     beep(BEEP_FREQ_BUTTON, 50);
   }
   lastButtons = nextButtons;
@@ -578,6 +664,8 @@ void setupDisplay() {
   display.init();
   display.setRotation(0);
   display.setBrightness(LCD_BRIGHTNESS);
+  currentBrightness = LCD_BRIGHTNESS;
+  lastUserActivityMs = millis();
 }
 
 void lvFlushCallback(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *colorP) {
@@ -605,18 +693,22 @@ void lvTouchReadCallback(lv_indev_drv_t *, lv_indev_data_t *data) {
     switch (action) {
       case S3UiTouchAction::CalibrateCenter:
         joystickCalibrateRequested = true;
+        markUserActivity();
         beep(BEEP_FREQ_BUTTON, 50);
         break;
       case S3UiTouchAction::CenterMinus:
         joystickCenterAdjust -= JOYSTICK_CENTER_ADJUST_STEP;
+        markUserActivity();
         beep(BEEP_FREQ_BUTTON, 30);
         break;
       case S3UiTouchAction::CenterPlus:
         joystickCenterAdjust += JOYSTICK_CENTER_ADJUST_STEP;
+        markUserActivity();
         beep(BEEP_FREQ_BUTTON, 30);
         break;
       case S3UiTouchAction::CloseSettings:
         settingsMode = false;
+        markUserActivity();
         transmitterArmed = false;
         armBrakeHolding = false;
         joystickValue = 0;
@@ -676,18 +768,35 @@ void setupEspNow() {
   esp_now_register_send_cb([](const uint8_t *, esp_now_send_status_t) {});
   esp_now_register_recv_cb([](const uint8_t *, const uint8_t *data, int len) {
     if (len != sizeof(StatusPacket)) {
+      diagnosticFaultCount++;
       return;
     }
     const StatusPacket *pkt = (const StatusPacket *)data;
-    if (pkt->head != 0x5A || pkt->type != 0x02) {
+    if (pkt->head != STATUS_PACKET_HEAD || pkt->type != STATUS_PACKET_TYPE || pkt->version != STATUS_PROTOCOL_VERSION) {
+      diagnosticFaultCount++;
       return;
     }
-    if (calcChecksum((const uint8_t *)pkt, sizeof(StatusPacket)) != pkt->checksum) {
+    if (protocolCrc8((const uint8_t *)pkt, sizeof(StatusPacket) - 1) != pkt->crc) {
+      diagnosticFaultCount++;
       return;
     }
+    if (!protocolSequenceIsFresh(pkt->sequence, lastStatusSequence, hasStatusSequence)) {
+      diagnosticFaultCount++;
+      return;
+    }
+    if (hasStatusSequence) {
+      const uint16_t delta = (uint16_t)(pkt->sequence - lastStatusSequence);
+      if (delta > 1) {
+        statusLostPackets = (uint16_t)clampInt((int)statusLostPackets + (int)delta - 1, 0, 65535);
+      }
+    }
+    protocolRememberSequence(pkt->sequence, lastStatusSequence, hasStatusSequence);
+    statusPacketCounter++;
+    diagnosticStatusPackets++;
     rssiValue = pkt->rssi;
     receiverVoltageX100 = pkt->voltage;
     receiverSpeed = pkt->speed;
+    receiverStatusFlags = pkt->status;
     lastRecvTime = millis();
     connected = true;
   });
@@ -699,12 +808,15 @@ void setupEspNow() {
 
 void sendControlPacket() {
   ControlPacket pkt = {};
-  pkt.head = 0xA5;
-  pkt.type = 0x01;
+  pkt.head = CONTROL_PACKET_HEAD;
+  pkt.type = CONTROL_PACKET_TYPE;
+  pkt.version = CONTROL_PROTOCOL_VERSION;
+  pkt.sequence = controlSequence++;
   pkt.throttle = settingsMode ? 0 : joystickValue;
   pkt.speedLevel = speedLevel;
   pkt.buttons = buttonState;
-  pkt.checksum = calcChecksum((const uint8_t *)&pkt, sizeof(pkt));
+  pkt.flags = transmitterArmed ? 0 : STATUS_FLAG_OUTPUT_LOCKED;
+  pkt.crc = protocolCrc8((const uint8_t *)&pkt, sizeof(pkt) - 1);
   esp_now_send(receiverMac, (const uint8_t *)&pkt, sizeof(pkt));
 }
 
@@ -763,6 +875,14 @@ void updateBatteryAlert() {
 }
 
 void updateDashboard() {
+  const uint32_t now = millis();
+  const uint32_t rateElapsedMs = now - lastStatusRateSampleMs;
+  if (rateElapsedMs >= 1000) {
+    statusPacketRateHz = (uint16_t)((statusPacketCounter * 1000UL + rateElapsedMs / 2UL) / rateElapsedMs);
+    statusPacketCounter = 0;
+    lastStatusRateSampleMs = now;
+  }
+
   S3UiState state = {};
   state.connected = connected;
   state.receiverVoltageX100 = receiverVoltageX100;
@@ -777,10 +897,84 @@ void updateDashboard() {
   state.qmcValid = qmc.valid;
   state.qmcHeadingDeg = qmc.headingDeg;
   state.mcuTemperatureC = mcuTemperatureC;
+  state.mcuTemperatureWarning = s3McuTemperatureWarns(isfinite(mcuTemperatureC), mcuTemperatureC, MCU_TEMPERATURE_WARN_C);
+  state.rssiValue = rssiValue;
+  state.receiverStatusFlags = receiverStatusFlags;
+  state.statusPacketRateHz = statusPacketRateHz;
+  state.statusLostPackets = statusLostPackets;
+  state.displayBrightness = currentBrightness;
   state.armed = transmitterArmed;
   state.settingsMode = settingsMode;
   state.joystickCenter = joystickCenter;
   s3_ui_update(state);
+}
+
+void printDiagnosticStatus() {
+  char line[96] = {};
+  diagnosticFormatStatusLine(line,
+                             sizeof(line),
+                             "s3_transmitter",
+                             connected,
+                             diagnosticStatusPackets,
+                             statusLostPackets,
+                             diagnosticFaultCount);
+  Serial.println(line);
+}
+
+void handleDiagnosticCommand(const String &line) {
+  if (line == "DIAG PING") {
+    Serial.println("DIAG PONG role=s3_transmitter protocol=2");
+    return;
+  }
+  if (line == "DIAG STATUS") {
+    printDiagnosticStatus();
+    return;
+  }
+  if (line.startsWith("DIAG SIMSTATUS ")) {
+    int rssi = -60;
+    int voltage = 4800;
+    int speed = 0;
+    int status = 0;
+    if (sscanf(line.c_str(), "DIAG SIMSTATUS %d %d %d %d", &rssi, &voltage, &speed, &status) != 4) {
+      Serial.println("DIAG ERR simstatus");
+      diagnosticFaultCount++;
+      return;
+    }
+    rssiValue = (int16_t)rssi;
+    receiverVoltageX100 = (uint16_t)clampInt(voltage, 0, 65535);
+    receiverSpeed = (uint16_t)clampInt(speed, 0, 65535);
+    receiverStatusFlags = (uint8_t)clampInt(status, 0, 255);
+    lastRecvTime = millis();
+    connected = true;
+    statusPacketCounter++;
+    diagnosticStatusPackets++;
+    Serial.println("DIAG OK simstatus");
+    return;
+  }
+  if (line.length() > 0) {
+    Serial.println("DIAG ERR unknown");
+    diagnosticFaultCount++;
+  }
+}
+
+void updateDiagnosticSerial() {
+  static String line;
+  while (Serial.available() > 0) {
+    const char c = (char)Serial.read();
+    if (c == '\r') {
+      continue;
+    }
+    if (c == '\n') {
+      handleDiagnosticCommand(line);
+      line = "";
+    } else if (line.length() < 96) {
+      line += c;
+    } else {
+      line = "";
+      diagnosticFaultCount++;
+      Serial.println("DIAG ERR overflow");
+    }
+  }
 }
 
 }  // namespace
@@ -797,7 +991,9 @@ void setup() {
                 S3_ESPNOW_TX_POWER_DBM_X4 / 4.0f);
 
   setupPins();
-  calibrateJoystickCenter();
+  if (!loadJoystickCalibration()) {
+    calibrateJoystickCenter();
+  }
   setupDisplay();
   setupLvgl();
   initLocalSensors();
@@ -811,9 +1007,12 @@ void setup() {
 }
 
 void loop() {
+  updateDiagnosticSerial();
   readInputs();
   if (joystickCenterAdjust != 0) {
     joystickCenter = clampInt(joystickCenter + joystickCenterAdjust, 1, 4094);
+    joystickCalibration.center = joystickCenter;
+    saveJoystickCalibration();
     joystickCenterAdjust = 0;
     transmitterArmed = false;
     armBrakeHolding = false;
@@ -851,6 +1050,8 @@ void loop() {
     lastLvglHandlerMs = now;
     lv_timer_handler();
   }
+
+  updateDisplayPower();
 
   if (now - lastDebugMs >= 1000) {
     lastDebugMs = now;

@@ -14,6 +14,8 @@
 #include <esp_wifi.h>
 #include "beep_profiles.h"
 #include "control_logic.h"
+#include "diagnostic_protocol.h"
+#include "protocol.h"
 // ========== 引脚定义 ==========
 #define PWM_OUT_1 4  //SERVO
 #define LED_STATUS 2
@@ -52,11 +54,36 @@ uint8_t s3TransmitterMac[] = { 0x48, 0xCA, 0x43, 0x9A, 0xA9, 0xB0 };
 typedef struct {
   uint8_t head;
   uint8_t type;
+  uint8_t version;
+  uint16_t sequence;
+  int16_t throttle;
+  uint8_t speedLevel;
+  uint8_t buttons;
+  uint8_t flags;
+  uint8_t crc;
+} ControlPacket;
+
+typedef struct {
+  uint8_t head;
+  uint8_t type;
   int16_t throttle;
   uint8_t speedLevel;
   uint8_t buttons;
   uint8_t checksum;
-} ControlPacket;
+} LegacyControlPacket;
+
+typedef struct {
+  uint8_t head;
+  uint8_t type;
+  uint8_t version;
+  uint16_t sequence;
+  int16_t rssi;
+  uint16_t voltage;
+  uint8_t motorPWM[4];
+  uint16_t speed;  //速度值（如km/h×10或RPM）
+  uint8_t status;
+  uint8_t crc;
+} StatusPacket;
 
 typedef struct {
   uint8_t head;
@@ -64,10 +91,10 @@ typedef struct {
   int16_t rssi;
   uint16_t voltage;
   uint8_t motorPWM[4];
-  uint16_t speed;  //速度值（如km/h×10或RPM）
+  uint16_t speed;
   uint8_t status;
   uint8_t checksum;
-} StatusPacket;
+} LegacyStatusPacket;
 
 #pragma pack(pop)
 
@@ -89,6 +116,14 @@ volatile uint8_t speedLevel = 1;
 volatile uint8_t buttons = 0;
 uint8_t statusTargetMac[6] = {};
 bool hasStatusTarget = false;
+bool statusTargetUsesLegacyProtocol = false;
+uint16_t lastControlSequence = 0;
+bool hasControlSequence = false;
+uint16_t statusSequence = 0;
+uint8_t stableControlPacketCount = 0;
+uint32_t diagnosticReceivedPackets = 0;
+uint32_t diagnosticLostPackets = 0;
+uint32_t diagnosticFaultCount = 0;
 
 int16_t smoothedThrottle = 0;
 int16_t lastPwmValue = -1;
@@ -96,6 +131,9 @@ int16_t lastPwmValue = -1;
 float batteryVoltage = 0.0;
 uint16_t batteryVoltageX100 = 0;
 bool failsafeActive = false;
+bool protocolFault = false;
+bool vescTelemetryValid = false;
+bool sourceOutputLocked = true;
 uint32_t failsafeBeepUntil = 0;
 uint32_t lastLinkAlertTime = 0;
 bool linkAlertHasFired = false;
@@ -204,28 +242,79 @@ void setupESPNOW() {
     esp_wifi_sta_get_ap_info(&ap_info);
     lastRssi = ap_info.rssi;  // 这个方法更可靠
 
-    if (len != sizeof(ControlPacket)) return;
-    ControlPacket *pkt = (ControlPacket *)data;
-    if (pkt->head != 0xA5 || pkt->type != 0x01) return;
+    int16_t receivedThrottle = 0;
+    uint8_t receivedSpeedLevel = 1;
+    uint8_t receivedButtons = 0;
+    uint8_t receivedFlags = 0;
+    bool legacyPacket = false;
 
-    // 校验和
-    uint8_t sum = 0;
-    for (uint8_t i = 0; i < sizeof(ControlPacket) - 1; i++) {
-      sum += ((uint8_t *)pkt)[i];
+    if (len == sizeof(ControlPacket)) {
+      ControlPacket *pkt = (ControlPacket *)data;
+      if (pkt->head != CONTROL_PACKET_HEAD || pkt->type != CONTROL_PACKET_TYPE || pkt->version != CONTROL_PROTOCOL_VERSION) {
+        protocolFault = true;
+        diagnosticFaultCount++;
+        return;
+      }
+
+      if (protocolCrc8((const uint8_t *)pkt, sizeof(ControlPacket) - 1) != pkt->crc) {
+        protocolFault = true;
+        diagnosticFaultCount++;
+        return;
+      }
+      if (!protocolSequenceIsFresh(pkt->sequence, lastControlSequence, hasControlSequence)) {
+        protocolFault = true;
+        diagnosticFaultCount++;
+        return;
+      }
+      protocolRememberSequence(pkt->sequence, lastControlSequence, hasControlSequence);
+      receivedThrottle = pkt->throttle;
+      receivedSpeedLevel = pkt->speedLevel;
+      receivedButtons = pkt->buttons;
+      receivedFlags = pkt->flags;
+    } else if (len == sizeof(LegacyControlPacket)) {
+      LegacyControlPacket *pkt = (LegacyControlPacket *)data;
+      if (pkt->head != CONTROL_PACKET_HEAD || pkt->type != CONTROL_PACKET_TYPE ||
+          !protocolLegacyChecksumIsValid((const uint8_t *)pkt, sizeof(LegacyControlPacket))) {
+        protocolFault = true;
+        diagnosticFaultCount++;
+        return;
+      }
+      legacyPacket = true;
+      receivedThrottle = pkt->throttle;
+      receivedSpeedLevel = pkt->speedLevel;
+      receivedButtons = pkt->buttons;
+    } else {
+      protocolFault = true;
+      diagnosticFaultCount++;
+      return;
     }
-    if (sum != pkt->checksum) return;
 
     const bool signalConnectionSuccess = shouldSignalReceiverConnectionSuccess(connected, failsafeActive);
 
     // 更新数据
     rememberStatusTarget(mac, statusTargetMac, hasStatusTarget);
-    throttle = pkt->throttle;
-    speedLevel = pkt->speedLevel;
-    buttons = pkt->buttons;
+    statusTargetUsesLegacyProtocol = legacyPacket;
+    sourceOutputLocked = legacyPacket ? false : (receivedFlags & STATUS_FLAG_OUTPUT_LOCKED) != 0;
+    if (stableControlPacketCount < 3) {
+      stableControlPacketCount++;
+    }
+    if (stableControlPacketCount < 3) {
+      throttle = 0;
+      speedLevel = 1;
+      buttons = 0;
+      lastRecvTime = millis();
+      protocolFault = false;
+      return;
+    }
+    throttle = receivedThrottle;
+    speedLevel = receivedSpeedLevel;
+    buttons = receivedButtons;
+    diagnosticReceivedPackets++;
     lastRssi = WiFi.RSSI();
     lastRecvTime = millis();
     connected = true;
     failsafeActive = false;
+    protocolFault = false;
     if (signalConnectionSuccess) {
       connectionBeepPending = true;
     }
@@ -308,6 +397,8 @@ void checkFailsafe() {
     buttons = safeState.buttons;
     connected = safeState.connected;
     failsafeActive = safeState.failsafeActive;
+    stableControlPacketCount = 0;
+    sourceOutputLocked = true;
     failsafeBeepUntil = millis() + 1000;
     Serial.println("失控保护启动！");
     beep(BEEP_FREQ_FAILSAFE, 1000);
@@ -378,23 +469,108 @@ void readBattery() {
 // ========== 回传数据 ==========
 void sendTelemetry() {
   // lastRssi = WiFi.RSSI();
+  if (!hasStatusTarget) {
+    return;
+  }
+  if (statusTargetUsesLegacyProtocol) {
+    LegacyStatusPacket pkt = {};
+    pkt.head = STATUS_PACKET_HEAD;
+    pkt.type = STATUS_PACKET_TYPE;
+    pkt.rssi = lastRssi;
+    pkt.voltage = batteryVoltageX100;
+    pkt.motorPWM[0] = (uint8_t)clampInt(mapLong(lastPwmValue, PWM_MIN, PWM_MAX, 0, 255), 0, 255);
+    pkt.speed = speed;
+    pkt.status = failsafeActive ? STATUS_FLAG_FAILSAFE : 0;
+    pkt.checksum = protocolLegacyChecksum((const uint8_t *)&pkt, sizeof(LegacyStatusPacket));
+    esp_now_send(statusTargetMac, (uint8_t *)&pkt, sizeof(pkt));
+    return;
+  }
+
   StatusPacket pkt = {};
-  pkt.head = 0x5A;
-  pkt.type = 0x02;
+  pkt.head = STATUS_PACKET_HEAD;
+  pkt.type = STATUS_PACKET_TYPE;
+  pkt.version = STATUS_PROTOCOL_VERSION;
+  pkt.sequence = statusSequence++;
   pkt.rssi = lastRssi;
   pkt.voltage = batteryVoltageX100;
   pkt.motorPWM[0] = (uint8_t)clampInt(mapLong(lastPwmValue, PWM_MIN, PWM_MAX, 0, 255), 0, 255);
   pkt.speed = speed;  // ← 新增：示例：0-100km/h
-  pkt.status = failsafeActive ? 0x01 : 0x00;
+  pkt.status = (failsafeActive ? STATUS_FLAG_FAILSAFE : 0) |
+               (vescTelemetryValid ? STATUS_FLAG_VESC_VALID : 0) |
+               (protocolFault ? STATUS_FLAG_PROTOCOL_FAULT : 0) |
+               (sourceOutputLocked ? STATUS_FLAG_OUTPUT_LOCKED : 0);
+  pkt.crc = protocolCrc8((const uint8_t *)&pkt, sizeof(StatusPacket) - 1);
 
-  uint8_t sum = 0;
-  for (uint8_t i = 0; i < sizeof(StatusPacket) - 1; i++) {
-    sum += ((uint8_t *)&pkt)[i];
+  esp_now_send(statusTargetMac, (uint8_t *)&pkt, sizeof(pkt));
+}
+
+void printDiagnosticStatus() {
+  char line[96] = {};
+  diagnosticFormatStatusLine(line,
+                             sizeof(line),
+                             "receiver",
+                             connected,
+                             diagnosticReceivedPackets,
+                             diagnosticLostPackets,
+                             diagnosticFaultCount);
+  Serial.println(line);
+}
+
+void handleDiagnosticCommand(const String &line) {
+  if (line == "DIAG PING") {
+    Serial.println("DIAG PONG role=receiver protocol=2 legacy=1");
+    return;
   }
-  pkt.checksum = sum;
+  if (line == "DIAG STATUS") {
+    printDiagnosticStatus();
+    return;
+  }
+  if (line.startsWith("DIAG SIMCTRL ")) {
+    int throttleValue = 0;
+    int speedValue = 1;
+    int buttonValue = 0;
+    int flagValue = 0;
+    if (sscanf(line.c_str(), "DIAG SIMCTRL %d %d %d %d", &throttleValue, &speedValue, &buttonValue, &flagValue) != 4) {
+      Serial.println("DIAG ERR simctrl");
+      diagnosticFaultCount++;
+      return;
+    }
+    throttle = (int16_t)clampInt(throttleValue, -1000, 1000);
+    speedLevel = (uint8_t)clampInt(speedValue, 1, 3);
+    buttons = (uint8_t)clampInt(buttonValue, 0, 255);
+    sourceOutputLocked = (flagValue & STATUS_FLAG_OUTPUT_LOCKED) != 0;
+    stableControlPacketCount = 3;
+    connected = true;
+    failsafeActive = false;
+    protocolFault = false;
+    lastRecvTime = millis();
+    diagnosticReceivedPackets++;
+    Serial.println("DIAG OK simctrl");
+    return;
+  }
+  if (line.length() > 0) {
+    Serial.println("DIAG ERR unknown");
+    diagnosticFaultCount++;
+  }
+}
 
-  if (hasStatusTarget) {
-    esp_now_send(statusTargetMac, (uint8_t *)&pkt, sizeof(pkt));
+void updateDiagnosticSerial() {
+  static String line;
+  while (Serial.available() > 0) {
+    const char c = (char)Serial.read();
+    if (c == '\r') {
+      continue;
+    }
+    if (c == '\n') {
+      handleDiagnosticCommand(line);
+      line = "";
+    } else if (line.length() < 96) {
+      line += c;
+    } else {
+      line = "";
+      diagnosticFaultCount++;
+      Serial.println("DIAG ERR overflow");
+    }
   }
 }
 
@@ -431,6 +607,7 @@ void setup() {
 
 void loop() {
   static uint32_t lastVescRead = 0;
+  updateDiagnosticSerial();
   checkFailsafe();
   updateLinkAlert();
   updateConnectionBeep();
@@ -470,6 +647,7 @@ void loop() {
   if (millis() - lastVescRead > 1000) {
     lastVescRead = millis();
     if (VESC.getVescValues()) {
+      vescTelemetryValid = true;
       // Serial.println("======== VESC 数据 ========");
       // Serial.print("输入电压: ");
       // Serial.print(VESC.data.inpVoltage);
@@ -499,6 +677,7 @@ void loop() {
       // Serial.println(" Ah");
       // Serial.println();
     } else {
+      vescTelemetryValid = false;
       Serial.println("❌ 读取 VESC 失败，请检查：接线、波特率、共地、IO6/IO7 是否可用");
     }
   }

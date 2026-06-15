@@ -50,6 +50,39 @@ inline int joystickToThrottle(int raw, int center, int deadzone) {
   return clampInt((int)mapped, -1000, 1000);
 }
 
+struct JoystickCalibration {
+  int center;
+  int minRaw;
+  int maxRaw;
+  int deadzone;
+};
+
+inline bool joystickCalibrationIsValid(const JoystickCalibration &calibration) {
+  return calibration.minRaw >= 0 &&
+         calibration.maxRaw <= 4095 &&
+         calibration.minRaw < calibration.center &&
+         calibration.center < calibration.maxRaw &&
+         calibration.deadzone >= 0 &&
+         calibration.deadzone <= 500;
+}
+
+inline int joystickToThrottleCalibrated(int raw, const JoystickCalibration &calibration) {
+  if (!joystickCalibrationIsValid(calibration)) {
+    return joystickToThrottle(raw, calibration.center, calibration.deadzone);
+  }
+  const int centered = raw - calibration.center;
+  if (centered > -calibration.deadzone && centered < calibration.deadzone) {
+    return 0;
+  }
+  long mapped;
+  if (centered > 0) {
+    mapped = mapLong(raw, calibration.center, calibration.maxRaw, 0, 1000);
+  } else {
+    mapped = mapLong(raw, calibration.minRaw, calibration.center, -1000, 0);
+  }
+  return clampInt((int)mapped, -1000, 1000);
+}
+
 inline int calibratedJoystickCenter(const int *samples, size_t sampleCount, int fallbackCenter) {
   if (samples == nullptr || sampleCount == 0) {
     return fallbackCenter;
