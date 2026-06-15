@@ -354,32 +354,32 @@ void test_s3_speed_label_color_uses_speed_bands() {
 }
 
 void test_s3_status_text_appends_lock_without_hiding_link_status() {
-  char buffer[16] = {};
+  char buffer[32] = {};
 
   s3FormatStatusText(buffer, sizeof(buffer), true, false);
-  TEST_ASSERT_EQUAL_STRING("OK LOCK", buffer);
+  TEST_ASSERT_EQUAL_STRING("已连接 锁定", buffer);
 
   s3FormatStatusText(buffer, sizeof(buffer), false, false);
-  TEST_ASSERT_EQUAL_STRING("LOST LOCK", buffer);
+  TEST_ASSERT_EQUAL_STRING("未连接 锁定", buffer);
 
   s3FormatStatusText(buffer, sizeof(buffer), true, true);
-  TEST_ASSERT_EQUAL_STRING("OK", buffer);
+  TEST_ASSERT_EQUAL_STRING("已连接", buffer);
 }
 
 void test_s3_main_status_text_prioritizes_actionable_states() {
-  char buffer[24] = {};
+  char buffer[32] = {};
 
   s3FormatMainStatusText(buffer, sizeof(buffer), false, true, false, false, 0);
-  TEST_ASSERT_EQUAL_STRING("STBY", buffer);
+  TEST_ASSERT_EQUAL_STRING("待机", buffer);
 
   s3FormatMainStatusText(buffer, sizeof(buffer), true, false, true, true, 0);
-  TEST_ASSERT_EQUAL_STRING("TAKEOVER", buffer);
+  TEST_ASSERT_EQUAL_STRING("接管中", buffer);
 
   s3FormatMainStatusText(buffer, sizeof(buffer), true, false, false, true, STATUS_FLAG_FAILSAFE);
-  TEST_ASSERT_EQUAL_STRING("RX FS", buffer);
+  TEST_ASSERT_EQUAL_STRING("接收失效", buffer);
 
   s3FormatMainStatusText(buffer, sizeof(buffer), true, false, false, false, 0);
-  TEST_ASSERT_EQUAL_STRING("OK LOCK", buffer);
+  TEST_ASSERT_EQUAL_STRING("已连接 锁定", buffer);
 }
 
 void test_s3_voltage_arc_value_clamps_to_vesc_display_range() {
@@ -421,53 +421,53 @@ void test_s3_mcu_temperature_formats_one_decimal_or_placeholder() {
 }
 
 void test_s3_diagnostic_text_formats_link_quality() {
-  char buffer[32] = {};
+  char buffer[48] = {};
   s3FormatLinkDiagnosticText(buffer, sizeof(buffer), -62, 48, 3);
-  TEST_ASSERT_EQUAL_STRING("RSSI -62 PKT 48 LOSS 3", buffer);
+  TEST_ASSERT_EQUAL_STRING("信号 -62 包 48 丢 3", buffer);
 }
 
 void test_s3_ui_detail_text_helpers_format_product_pages() {
-  char buffer[48] = {};
+  char buffer[96] = {};
 
   s3FormatProtocolText(buffer, sizeof(buffer));
-  TEST_ASSERT_EQUAL_STRING("CTRL v2 STAT v2", buffer);
+  TEST_ASSERT_EQUAL_STRING("协议 控制v2 状态v2", buffer);
 
   s3FormatSequenceText(buffer, sizeof(buffer), 12, 34);
-  TEST_ASSERT_EQUAL_STRING("TX 12 RX 34", buffer);
+  TEST_ASSERT_EQUAL_STRING("发送 12 接收 34", buffer);
 
   s3FormatVescText(buffer, sizeof(buffer), STATUS_FLAG_VESC_VALID);
-  TEST_ASSERT_EQUAL_STRING("VESC OK", buffer);
+  TEST_ASSERT_EQUAL_STRING("电调 正常", buffer);
 
   s3FormatSensorsText(buffer, sizeof(buffer), true, false, true);
-  TEST_ASSERT_EQUAL_STRING("CW OK BMP N/A QMC OK", buffer);
+  TEST_ASSERT_EQUAL_STRING("传感器 电池正常 气压无 指南正常", buffer);
 
-  s3FormatJoystickText(buffer, sizeof(buffer), "RAW", 2048);
-  TEST_ASSERT_EQUAL_STRING("RAW 2048", buffer);
+  s3FormatJoystickText(buffer, sizeof(buffer), "摇杆原始", 2048);
+  TEST_ASSERT_EQUAL_STRING("摇杆原始 2048", buffer);
 
   s3FormatFirmwareText(buffer, sizeof(buffer), "s3-remote", "Jun 15 2026");
-  TEST_ASSERT_EQUAL_STRING("FW s3-remote Jun 15 2026", buffer);
+  TEST_ASSERT_EQUAL_STRING("固件 s3-remote Jun 15 2026", buffer);
 
   s3FormatBrightnessText(buffer, sizeof(buffer), 140);
-  TEST_ASSERT_EQUAL_STRING("BRI 140", buffer);
+  TEST_ASSERT_EQUAL_STRING("亮度 140", buffer);
 
   TEST_ASSERT_EQUAL_UINT8(20, s3ClampUserBrightness(0));
   TEST_ASSERT_EQUAL_UINT8(140, s3ClampUserBrightness(140));
   TEST_ASSERT_EQUAL_UINT8(255, s3ClampUserBrightness(300));
 
   s3FormatPowerModeText(buffer, sizeof(buffer), false, true);
-  TEST_ASSERT_EQUAL_STRING("DIM", buffer);
+  TEST_ASSERT_EQUAL_STRING("变暗", buffer);
 
   s3FormatUpgradeText(buffer, sizeof(buffer));
-  TEST_ASSERT_EQUAL_STRING("USB: pio upload", buffer);
+  TEST_ASSERT_EQUAL_STRING("升级 USB烧录", buffer);
 }
 
 void test_s3_receiver_status_text_decodes_flags() {
   char buffer[48] = {};
   s3FormatReceiverStatusFlags(buffer, sizeof(buffer), STATUS_FLAG_FAILSAFE | STATUS_FLAG_PROTOCOL_FAULT);
-  TEST_ASSERT_EQUAL_STRING("FS PROTO", buffer);
+  TEST_ASSERT_EQUAL_STRING("失效 协议", buffer);
 
   s3FormatReceiverStatusFlags(buffer, sizeof(buffer), STATUS_FLAG_VESC_VALID | STATUS_FLAG_OUTPUT_LOCKED);
-  TEST_ASSERT_EQUAL_STRING("VESC LOCK", buffer);
+  TEST_ASSERT_EQUAL_STRING("电调 锁定", buffer);
 }
 
 void test_s3_mcu_temperature_warning_threshold() {

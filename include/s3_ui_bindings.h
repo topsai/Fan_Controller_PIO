@@ -42,7 +42,7 @@ inline void s3FormatStatusText(char *buffer, size_t bufferSize, bool connected, 
   if (bufferSize == 0) {
     return;
   }
-  snprintf(buffer, bufferSize, "%s%s", connected ? "OK" : "LOST", armed ? "" : " LOCK");
+  snprintf(buffer, bufferSize, "%s%s", connected ? "已连接" : "未连接", armed ? "" : " 锁定");
 }
 
 inline void s3FormatMainStatusText(
@@ -58,19 +58,19 @@ inline void s3FormatMainStatusText(
     return;
   }
   if (takeoverActive) {
-    snprintf(buffer, bufferSize, "TAKEOVER");
+    snprintf(buffer, bufferSize, "接管中");
     return;
   }
   if (connected && (receiverStatusFlags & STATUS_FLAG_FAILSAFE) != 0) {
-    snprintf(buffer, bufferSize, "RX FS");
+    snprintf(buffer, bufferSize, "接收失效");
     return;
   }
   if (connected && (receiverStatusFlags & STATUS_FLAG_PROTOCOL_FAULT) != 0) {
-    snprintf(buffer, bufferSize, "PROTO");
+    snprintf(buffer, bufferSize, "协议异常");
     return;
   }
   if (standby && !connected) {
-    snprintf(buffer, bufferSize, "STBY");
+    snprintf(buffer, bufferSize, "待机");
     return;
   }
   s3FormatStatusText(buffer, bufferSize, connected, armed);
@@ -128,28 +128,28 @@ inline void s3FormatLinkDiagnosticText(char *buffer, size_t bufferSize, int16_t 
   if (bufferSize == 0) {
     return;
   }
-  snprintf(buffer, bufferSize, "RSSI %d PKT %u LOSS %u", rssi, packetRateHz, lostPackets);
+  snprintf(buffer, bufferSize, "信号 %d 包 %u 丢 %u", rssi, packetRateHz, lostPackets);
 }
 
 inline void s3FormatProtocolText(char *buffer, size_t bufferSize) {
   if (bufferSize == 0) {
     return;
   }
-  snprintf(buffer, bufferSize, "CTRL v%u STAT v%u", CONTROL_PROTOCOL_VERSION, STATUS_PROTOCOL_VERSION);
+  snprintf(buffer, bufferSize, "协议 控制v%u 状态v%u", CONTROL_PROTOCOL_VERSION, STATUS_PROTOCOL_VERSION);
 }
 
 inline void s3FormatSequenceText(char *buffer, size_t bufferSize, uint16_t controlSequence, uint16_t statusSequence) {
   if (bufferSize == 0) {
     return;
   }
-  snprintf(buffer, bufferSize, "TX %u RX %u", controlSequence, statusSequence);
+  snprintf(buffer, bufferSize, "发送 %u 接收 %u", controlSequence, statusSequence);
 }
 
 inline void s3FormatVescText(char *buffer, size_t bufferSize, uint8_t receiverStatusFlags) {
   if (bufferSize == 0) {
     return;
   }
-  snprintf(buffer, bufferSize, (receiverStatusFlags & STATUS_FLAG_VESC_VALID) != 0 ? "VESC OK" : "VESC N/A");
+  snprintf(buffer, bufferSize, (receiverStatusFlags & STATUS_FLAG_VESC_VALID) != 0 ? "电调 正常" : "电调 无数据");
 }
 
 inline void s3FormatSensorsText(char *buffer, size_t bufferSize, bool cwValid, bool bmpValid, bool qmcValid) {
@@ -158,10 +158,10 @@ inline void s3FormatSensorsText(char *buffer, size_t bufferSize, bool cwValid, b
   }
   snprintf(buffer,
            bufferSize,
-           "CW %s BMP %s QMC %s",
-           cwValid ? "OK" : "N/A",
-           bmpValid ? "OK" : "N/A",
-           qmcValid ? "OK" : "N/A");
+           "传感器 电池%s 气压%s 指南%s",
+           cwValid ? "正常" : "无",
+           bmpValid ? "正常" : "无",
+           qmcValid ? "正常" : "无");
 }
 
 inline void s3FormatJoystickText(char *buffer, size_t bufferSize, const char *label, int value) {
@@ -175,14 +175,14 @@ inline void s3FormatFirmwareText(char *buffer, size_t bufferSize, const char *ve
   if (bufferSize == 0) {
     return;
   }
-  snprintf(buffer, bufferSize, "FW %s %s", version, buildDate);
+  snprintf(buffer, bufferSize, "固件 %s %s", version, buildDate);
 }
 
 inline void s3FormatBrightnessText(char *buffer, size_t bufferSize, uint8_t brightness) {
   if (bufferSize == 0) {
     return;
   }
-  snprintf(buffer, bufferSize, "BRI %u", brightness);
+  snprintf(buffer, bufferSize, "亮度 %u", brightness);
 }
 
 inline uint8_t s3ClampUserBrightness(int value) {
@@ -193,14 +193,14 @@ inline void s3FormatPowerModeText(char *buffer, size_t bufferSize, bool standby,
   if (bufferSize == 0) {
     return;
   }
-  snprintf(buffer, bufferSize, "%s", standby ? "STANDBY" : (dimmed ? "DIM" : "ACTIVE"));
+  snprintf(buffer, bufferSize, "%s", standby ? "待机" : (dimmed ? "变暗" : "活动"));
 }
 
 inline void s3FormatUpgradeText(char *buffer, size_t bufferSize) {
   if (bufferSize == 0) {
     return;
   }
-  snprintf(buffer, bufferSize, "USB: pio upload");
+  snprintf(buffer, bufferSize, "升级 USB烧录");
 }
 
 inline void s3FormatReceiverStatusFlags(char *buffer, size_t bufferSize, uint8_t flags) {
@@ -208,25 +208,25 @@ inline void s3FormatReceiverStatusFlags(char *buffer, size_t bufferSize, uint8_t
     return;
   }
   if (flags == 0) {
-    snprintf(buffer, bufferSize, "OK");
+    snprintf(buffer, bufferSize, "正常");
     return;
   }
   char text[48] = {};
   bool wrote = false;
   if ((flags & STATUS_FLAG_FAILSAFE) != 0) {
-    snprintf(text + strlen(text), sizeof(text) - strlen(text), "%sFS", wrote ? " " : "");
+    snprintf(text + strlen(text), sizeof(text) - strlen(text), "%s失效", wrote ? " " : "");
     wrote = true;
   }
   if ((flags & STATUS_FLAG_PROTOCOL_FAULT) != 0) {
-    snprintf(text + strlen(text), sizeof(text) - strlen(text), "%sPROTO", wrote ? " " : "");
+    snprintf(text + strlen(text), sizeof(text) - strlen(text), "%s协议", wrote ? " " : "");
     wrote = true;
   }
   if ((flags & STATUS_FLAG_VESC_VALID) != 0) {
-    snprintf(text + strlen(text), sizeof(text) - strlen(text), "%sVESC", wrote ? " " : "");
+    snprintf(text + strlen(text), sizeof(text) - strlen(text), "%s电调", wrote ? " " : "");
     wrote = true;
   }
   if ((flags & STATUS_FLAG_OUTPUT_LOCKED) != 0) {
-    snprintf(text + strlen(text), sizeof(text) - strlen(text), "%sLOCK", wrote ? " " : "");
+    snprintf(text + strlen(text), sizeof(text) - strlen(text), "%s锁定", wrote ? " " : "");
   }
   snprintf(buffer, bufferSize, "%s", text);
 }

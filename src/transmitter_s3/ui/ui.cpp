@@ -25,6 +25,7 @@ extern lv_obj_t *ui_LabelBrightness __attribute__((weak));
 extern lv_obj_t *ui_LabelPowerMode __attribute__((weak));
 extern lv_obj_t *ui_LabelUpgrade __attribute__((weak));
 extern lv_obj_t *ui_SliderBrightness __attribute__((weak));
+extern const lv_font_t ui_font_ChineseSmall __attribute__((weak));
 }
 
 namespace {
@@ -44,6 +45,12 @@ uint8_t brightnessRequest = 0;
 
 lv_obj_t *optionalUiObject(lv_obj_t **symbol) {
   return symbol == nullptr ? nullptr : *symbol;
+}
+
+void applyChineseFont(lv_obj_t *object) {
+  if (object != nullptr && &ui_font_ChineseSmall != nullptr) {
+    lv_obj_set_style_text_font(object, &ui_font_ChineseSmall, LV_PART_MAIN);
+  }
 }
 
 lv_obj_t *batteryArc() {
@@ -187,6 +194,7 @@ lv_obj_t *createSettingsButton(lv_obj_t *parent, const char *text, int16_t x, in
   lv_obj_set_style_bg_color(button, lv_color_hex(0x202833), LV_PART_MAIN);
   lv_obj_t *label = lv_label_create(button);
   lv_label_set_text(label, text);
+  applyChineseFont(label);
   lv_obj_set_style_text_color(label, lv_color_white(), LV_PART_MAIN);
   lv_obj_center(label);
   return button;
@@ -208,22 +216,25 @@ void createSettingsPanel() {
   lv_obj_clear_flag(settingsPanel, LV_OBJ_FLAG_SCROLLABLE);
 
   settingsTitleLabel = lv_label_create(settingsPanel);
-  lv_label_set_text(settingsTitleLabel, "JOYSTICK SET");
+  lv_label_set_text(settingsTitleLabel, "摇杆设置");
+  applyChineseFont(settingsTitleLabel);
   lv_obj_set_style_text_color(settingsTitleLabel, lv_color_hex(0x00D8FF), LV_PART_MAIN);
   lv_obj_align(settingsTitleLabel, LV_ALIGN_TOP_MID, 0, 8);
 
   settingsCenterLabel = lv_label_create(settingsPanel);
-  lv_label_set_text(settingsCenterLabel, "CENTER 2048");
+  lv_label_set_text(settingsCenterLabel, "中心 2048");
+  applyChineseFont(settingsCenterLabel);
   lv_obj_set_style_text_color(settingsCenterLabel, lv_color_white(), LV_PART_MAIN);
   lv_obj_align(settingsCenterLabel, LV_ALIGN_TOP_MID, 0, 36);
 
   settingsMinusButton = createSettingsButton(settingsPanel, "-10", 12, 68, 52, 36);
-  settingsCalButton = createSettingsButton(settingsPanel, "CAL", 78, 68, 52, 36);
+  settingsCalButton = createSettingsButton(settingsPanel, "校准", 78, 68, 52, 36);
   settingsPlusButton = createSettingsButton(settingsPanel, "+10", 144, 68, 52, 36);
-  settingsCloseButton = createSettingsButton(settingsPanel, "EXIT", 60, 116, 90, 34);
+  settingsCloseButton = createSettingsButton(settingsPanel, "退出", 60, 116, 90, 34);
 
   settingsHintLabel = lv_label_create(settingsPanel);
-  lv_label_set_text(settingsHintLabel, "Output locked");
+  lv_label_set_text(settingsHintLabel, "输出锁定");
+  applyChineseFont(settingsHintLabel);
   lv_obj_set_style_text_color(settingsHintLabel, lv_color_hex(0xFFD23F), LV_PART_MAIN);
   lv_obj_align(settingsHintLabel, LV_ALIGN_BOTTOM_MID, 0, -4);
 
@@ -265,7 +276,8 @@ void s3_ui_init() {
   }
 
   if (statusValueLabel() != nullptr) {
-    lv_label_set_text(statusValueLabel(), "LOST");
+    lv_label_set_text(statusValueLabel(), "未连接");
+    applyChineseFont(statusValueLabel());
     lv_obj_set_style_text_color(statusValueLabel(), lv_color_hex(0xFF4040), LV_PART_MAIN);
   }
 
@@ -274,9 +286,9 @@ void s3_ui_init() {
   }
 
   if (bmp280ValueLabel() != nullptr) {
-    lv_label_set_text(bmp280ValueLabel(), "BMP N/A");
+    lv_label_set_text(bmp280ValueLabel(), "气压 --\n高度 --");
     lv_obj_set_style_text_color(bmp280ValueLabel(), lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(bmp280ValueLabel(), &lv_font_montserrat_12, LV_PART_MAIN);
+    applyChineseFont(bmp280ValueLabel());
     lv_obj_set_style_text_align(bmp280ValueLabel(), LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
   }
 
@@ -308,57 +320,72 @@ void s3_ui_init() {
   if (mcuTemperatureLabel() != nullptr) {
     lv_label_set_text(mcuTemperatureLabel(), "--.-C");
     lv_obj_set_style_text_color(mcuTemperatureLabel(), lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(mcuTemperatureLabel(), &lv_font_montserrat_12, LV_PART_MAIN);
+    applyChineseFont(mcuTemperatureLabel());
   }
 
   if (linkDiagnosticLabel() != nullptr) {
-    lv_label_set_text(linkDiagnosticLabel(), "RSSI -- PKT 0 LOSS 0");
+    lv_label_set_text(linkDiagnosticLabel(), "信号 -- 包 0 丢 0");
+    applyChineseFont(linkDiagnosticLabel());
   }
   if (receiverFlagsLabel() != nullptr) {
-    lv_label_set_text(receiverFlagsLabel(), "OK");
+    lv_label_set_text(receiverFlagsLabel(), "正常");
+    applyChineseFont(receiverFlagsLabel());
   }
   if (protocolLabel() != nullptr) {
     char buffer[32] = {};
     s3FormatProtocolText(buffer, sizeof(buffer));
     lv_label_set_text(protocolLabel(), buffer);
+    applyChineseFont(protocolLabel());
   }
   if (sequenceLabel() != nullptr) {
-    lv_label_set_text(sequenceLabel(), "TX 0 RX 0");
+    lv_label_set_text(sequenceLabel(), "发送 0 接收 0");
+    applyChineseFont(sequenceLabel());
   }
   if (vescLabel() != nullptr) {
-    lv_label_set_text(vescLabel(), "VESC N/A");
+    lv_label_set_text(vescLabel(), "电调 无数据");
+    applyChineseFont(vescLabel());
   }
   if (sensorsLabel() != nullptr) {
-    lv_label_set_text(sensorsLabel(), "CW N/A BMP N/A QMC N/A");
+    lv_label_set_text(sensorsLabel(), "传感器 电池无 气压无 指南无");
+    applyChineseFont(sensorsLabel());
   }
   if (joyCenterLabel() != nullptr) {
-    lv_label_set_text(joyCenterLabel(), "CENTER 2048");
+    lv_label_set_text(joyCenterLabel(), "摇杆中心 2048");
+    applyChineseFont(joyCenterLabel());
   }
   if (joyRawLabel() != nullptr) {
-    lv_label_set_text(joyRawLabel(), "RAW 2048");
+    lv_label_set_text(joyRawLabel(), "摇杆原始 2048");
+    applyChineseFont(joyRawLabel());
   }
   if (joyOutLabel() != nullptr) {
-    lv_label_set_text(joyOutLabel(), "OUT 0");
+    lv_label_set_text(joyOutLabel(), "摇杆输出 0");
+    applyChineseFont(joyOutLabel());
   }
   if (joyRangeLabel() != nullptr) {
-    lv_label_set_text(joyRangeLabel(), "MIN 0 MAX 4095 DZ 50");
+    lv_label_set_text(joyRangeLabel(), "最小 0 最大 4095 死区 50");
+    applyChineseFont(joyRangeLabel());
   }
   if (speedAdcLabel() != nullptr) {
-    lv_label_set_text(speedAdcLabel(), "SPD ADC 0");
+    lv_label_set_text(speedAdcLabel(), "速度旋钮 0");
+    applyChineseFont(speedAdcLabel());
   }
   if (firmwareLabel() != nullptr) {
-    lv_label_set_text(firmwareLabel(), "FW");
+    lv_label_set_text(firmwareLabel(), "固件");
+    applyChineseFont(firmwareLabel());
   }
   if (brightnessLabel() != nullptr) {
-    lv_label_set_text(brightnessLabel(), "BRI 0");
+    lv_label_set_text(brightnessLabel(), "亮度 0");
+    applyChineseFont(brightnessLabel());
   }
   if (powerModeLabel() != nullptr) {
-    lv_label_set_text(powerModeLabel(), "ACTIVE");
+    lv_label_set_text(powerModeLabel(), "活动");
+    applyChineseFont(powerModeLabel());
   }
   if (upgradeLabel() != nullptr) {
     char buffer[32] = {};
     s3FormatUpgradeText(buffer, sizeof(buffer));
     lv_label_set_text(upgradeLabel(), buffer);
+    applyChineseFont(upgradeLabel());
   }
   if (brightnessSlider() != nullptr) {
     lv_slider_set_range(brightnessSlider(), 20, 255);
@@ -419,7 +446,7 @@ void s3_ui_update(const S3UiState &state) {
     if (state.bmp280Valid) {
       snprintf(buffer, sizeof(buffer), "%.0fhPa\n%.0fm", state.bmp280PressureHpa, state.bmp280AltitudeM);
     } else {
-      snprintf(buffer, sizeof(buffer), "BMP N/A");
+      snprintf(buffer, sizeof(buffer), "气压 --\n高度 --");
     }
     lv_label_set_text(bmp280ValueLabel(), buffer);
   }
@@ -483,28 +510,28 @@ void s3_ui_update(const S3UiState &state) {
     lv_label_set_text(sensorsLabel(), buffer);
   }
   if (joyCenterLabel() != nullptr) {
-    s3FormatJoystickText(buffer, sizeof(buffer), "CENTER", state.joystickCenter);
+    s3FormatJoystickText(buffer, sizeof(buffer), "摇杆中心", state.joystickCenter);
     lv_label_set_text(joyCenterLabel(), buffer);
   }
   if (joyRawLabel() != nullptr) {
-    s3FormatJoystickText(buffer, sizeof(buffer), "RAW", state.joystickRawAdc);
+    s3FormatJoystickText(buffer, sizeof(buffer), "摇杆原始", state.joystickRawAdc);
     lv_label_set_text(joyRawLabel(), buffer);
   }
   if (joyOutLabel() != nullptr) {
-    s3FormatJoystickText(buffer, sizeof(buffer), "OUT", state.joystickValue);
+    s3FormatJoystickText(buffer, sizeof(buffer), "摇杆输出", state.joystickValue);
     lv_label_set_text(joyOutLabel(), buffer);
   }
   if (joyRangeLabel() != nullptr) {
     snprintf(buffer,
              sizeof(buffer),
-             "MIN %d MAX %d DZ %d",
+             "最小 %d 最大 %d 死区 %d",
              state.joystickMinRaw,
              state.joystickMaxRaw,
              state.joystickDeadzone);
     lv_label_set_text(joyRangeLabel(), buffer);
   }
   if (speedAdcLabel() != nullptr) {
-    snprintf(buffer, sizeof(buffer), "SPD ADC %u", state.speedAdcRaw);
+    snprintf(buffer, sizeof(buffer), "速度旋钮 %u", state.speedAdcRaw);
     lv_label_set_text(speedAdcLabel(), buffer);
   }
   if (firmwareLabel() != nullptr) {
@@ -529,11 +556,11 @@ void s3_ui_update(const S3UiState &state) {
 
   s3_ui_set_settings_visible(state.settingsMode);
   if (settingsCenterLabel != nullptr) {
-    snprintf(buffer, sizeof(buffer), "CENTER %d", state.joystickCenter);
+    snprintf(buffer, sizeof(buffer), "中心 %d", state.joystickCenter);
     lv_label_set_text(settingsCenterLabel, buffer);
   }
   if (settingsHintLabel != nullptr) {
-    lv_label_set_text(settingsHintLabel, state.armed ? "Output locked" : "Re-arm after exit");
+    lv_label_set_text(settingsHintLabel, state.armed ? "输出锁定" : "退出后重新解锁");
   }
 }
 

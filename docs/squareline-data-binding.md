@@ -35,7 +35,7 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 
 诊断页、校准页、系统页的最终对象名见 `docs/s3-ui-final-components.md`。这些对象在固件中按弱符号可选绑定：SquareLine 尚未创建时会自动跳过，创建并导出后会自动显示数据或响应按钮。
 
-当前 SquareLine 导出的电池 Arc 实例名是 `ui_ArcBattery`，电量文字是 `ui_LabelBattery`，代码已按这两个实际名称绑定。最终以 `src/transmitter_s3/ui/generated/ui_Screen1.h` 中的 `extern lv_obj_t * ...` 声明为准。
+当前 SquareLine 导出的电池 Arc 实例名是 `ui_ArcBattery`，电量文字是 `ui_LabelBattery`，代码已按这两个实际名称绑定。最终以 `src/transmitter_s3/ui/generated/ui_ScreenMain.h` 中的 `extern lv_obj_t * ...` 声明为准。
 
 当前 SquareLine 导出的速度 Label 实例名是 `ui_LabelSpeed`。速度颜色规则在 `include/s3_ui_bindings.h` 的 `s3SpeedColorHex()` 中维护：低于 15 km/h 为绿色，15-29 km/h 为黄色，30 km/h 及以上为红色。
 
@@ -74,7 +74,7 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 ## 重新导出后的检查
 
 - `src/transmitter_s3/ui/generated/ui.h` 应包含对应对象的声明。
-- `src/transmitter_s3/ui/generated/ui_Screen1.c` 应创建对应对象。
+- `src/transmitter_s3/ui/generated/ui_ScreenMain.c` 应创建对应对象。
 - 如果对象名称改变，需要同步修改 `src/transmitter_s3/ui/ui.cpp` 的绑定代码。
-- 若编译报 `was not declared in this scope`，优先检查 `ui.cpp` 引用的控件名是否和 `ui_Screen1.h` 中的实际导出名一致。
+- 若编译报 `was not declared in this scope`，优先检查 `ui.cpp` 引用的控件名是否和 `ui_ScreenMain.h` 中的实际导出名一致。
 - 导出后先运行 `pio run -e s3_transmitter`。构建脚本会自动修复 SquareLine 颜色检查和 true color 图片字节序。
