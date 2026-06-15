@@ -34,6 +34,7 @@ git status -sb
 | `docs/ui-workflow.md` | SquareLine 工程、导出目录、生成代码边界 |
 | `docs/squareline-data-binding.md` | UI 控件命名、数据绑定和适配层规则 |
 | `docs/s3-ui-final-components.md` | S3 最终页面和组件对象名清单 |
+| `docs/ui-field-reference.md` | S3 每个 Screen/组件、C3 OLED 每个页面/字段的调试字典 |
 | `docs/superpowers/plans/` | 已有阶段计划和 UI/硬件推进思路 |
 
 ## 当前项目状态记录
@@ -93,7 +94,7 @@ git pull
 如果任务和 S3 UI 有关，再补一句：
 
 ```text
-这次任务涉及 S3 UI，请同时阅读 docs/ui-workflow.md、docs/squareline-data-binding.md 和 docs/s3-ui-final-components.md。
+这次任务涉及 UI，请同时阅读 docs/ui-workflow.md、docs/squareline-data-binding.md、docs/s3-ui-final-components.md 和 docs/ui-field-reference.md。
 ```
 
 ## 每次阶段性结束前
