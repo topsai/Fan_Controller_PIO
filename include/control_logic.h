@@ -209,3 +209,92 @@ inline void rememberStatusTarget(const uint8_t *sourceMac, uint8_t *targetMac, b
   memcpy(targetMac, sourceMac, 6);
   hasTarget = true;
 }
+
+struct ControllerSourceState {
+  bool hasActiveController;
+  bool activeUsesLegacyProtocol;
+  uint32_t lastSeenMs;
+  uint8_t activeMac[6];
+};
+
+inline bool controllerMacEquals(const uint8_t *left, const uint8_t *right) {
+  return left != nullptr && right != nullptr && memcmp(left, right, 6) == 0;
+}
+
+inline void rememberActiveController(const uint8_t *sourceMac, ControllerSourceState &state, bool legacyProtocol, uint32_t nowMs) {
+  if (sourceMac == nullptr) {
+    return;
+  }
+  memcpy(state.activeMac, sourceMac, 6);
+  state.hasActiveController = true;
+  state.activeUsesLegacyProtocol = legacyProtocol;
+  state.lastSeenMs = nowMs;
+}
+
+inline bool controllerSourceIsActive(const uint8_t *sourceMac, const ControllerSourceState &state) {
+  return state.hasActiveController && controllerMacEquals(sourceMac, state.activeMac);
+}
+
+inline bool controllerSourceAllowsPacket(
+  const uint8_t *sourceMac,
+  const ControllerSourceState &state,
+  bool activeOnline,
+  bool takeoverRequested
+) {
+  if (!state.hasActiveController || !activeOnline) {
+    return true;
+  }
+  if (controllerSourceIsActive(sourceMac, state)) {
+    return true;
+  }
+  return takeoverRequested;
+}
+
+inline bool controllerSourceShouldResetForTakeover(
+  const uint8_t *sourceMac,
+  const ControllerSourceState &state,
+  bool takeoverRequested
+) {
+  return state.hasActiveController &&
+         takeoverRequested &&
+         !controllerSourceIsActive(sourceMac, state);
+}
+
+inline void releaseActiveControllerIfTimedOut(ControllerSourceState &state, uint32_t nowMs, uint32_t timeoutMs) {
+  if (state.hasActiveController && nowMs - state.lastSeenMs > timeoutMs) {
+    state.hasActiveController = false;
+    state.activeUsesLegacyProtocol = false;
+  }
+}
+
+enum ButtonPressEvent {
+  BUTTON_PRESS_NONE = 0,
+  BUTTON_PRESS_SHORT = 1,
+  BUTTON_PRESS_LONG = 2,
+};
+
+struct ButtonLongPressState {
+  bool wasDown;
+  bool longPressFired;
+  uint32_t pressedAtMs;
+};
+
+inline ButtonPressEvent buttonLongPressUpdate(bool isDown, uint32_t nowMs, uint32_t longPressMs, ButtonLongPressState &state) {
+  if (isDown && !state.wasDown) {
+    state.wasDown = true;
+    state.longPressFired = false;
+    state.pressedAtMs = nowMs;
+    return BUTTON_PRESS_NONE;
+  }
+  if (isDown && state.wasDown && !state.longPressFired && nowMs - state.pressedAtMs >= longPressMs) {
+    state.longPressFired = true;
+    return BUTTON_PRESS_LONG;
+  }
+  if (!isDown && state.wasDown) {
+    const bool wasLong = state.longPressFired;
+    state.wasDown = false;
+    state.longPressFired = false;
+    return wasLong ? BUTTON_PRESS_NONE : BUTTON_PRESS_SHORT;
+  }
+  return BUTTON_PRESS_NONE;
+}

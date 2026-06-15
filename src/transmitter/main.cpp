@@ -47,6 +47,8 @@
 #define ARM_BRAKE_THRESHOLD -900
 #define ARM_BRAKE_HOLD_MS 3000
 #define THROTTLE_SLEW_STEP 40
+#define TAKEOVER_LONG_PRESS_MS 3000
+#define TAKEOVER_REQUEST_WINDOW_MS 1000
 
 // ========== CW2015寄存器 ==========
 #define CW2015_ADDR 0x62         // CW2015 I2C地址 [^43^]
@@ -130,6 +132,8 @@ bool settingsMode = false;
 bool joystickCalibrateRequested = false;
 uint32_t armBrakeHoldStartMs = 0;
 bool armBrakeHolding = false;
+ButtonLongPressState button1LongPressState = {};
+uint32_t takeoverRequestUntilMs = 0;
 
 // 连接状态
 volatile bool connected = false;
@@ -309,15 +313,23 @@ void readButtons() {
   if (rawBtn1 != lastBtn1 && millis() - lastDebounce1 > 20) {
     lastDebounce1 = millis();
     lastBtn1 = rawBtn1;
-    if (rawBtn1) {
-      button1Pressed = true;
-      settingsMode = !settingsMode;
-      transmitterArmed = false;
-      armBrakeHolding = false;
-      joystickValue = 0;
-      buttonState = 0;
-      beep(BEEP_FREQ_BUTTON, 50);  // 按键音
-    }
+  }
+
+  const ButtonPressEvent button1Event = buttonLongPressUpdate(lastBtn1, millis(), TAKEOVER_LONG_PRESS_MS, button1LongPressState);
+  if (button1Event == BUTTON_PRESS_SHORT) {
+    button1Pressed = true;
+    settingsMode = !settingsMode;
+    transmitterArmed = false;
+    armBrakeHolding = false;
+    joystickValue = 0;
+    buttonState = 0;
+    beep(BEEP_FREQ_BUTTON, 50);  // 按键音
+  } else if (button1Event == BUTTON_PRESS_LONG) {
+    takeoverRequestUntilMs = millis() + TAKEOVER_REQUEST_WINDOW_MS;
+    transmitterArmed = false;
+    armBrakeHolding = false;
+    joystickValue = 0;
+    beep(BEEP_FREQ_CONNECTED, 80);
   }
 
   if (rawBtn2 != lastBtn2 && millis() - lastDebounce2 > 20) {
@@ -364,6 +376,9 @@ void sendControlData() {
   pkt.speedLevel = speedLevel;
   pkt.buttons = buttonState;
   pkt.flags = transmitterArmed ? 0 : STATUS_FLAG_OUTPUT_LOCKED;
+  if (millis() < takeoverRequestUntilMs) {
+    pkt.flags |= CONTROL_FLAG_TAKEOVER_REQUEST;
+  }
   pkt.crc = protocolCrc8((const uint8_t *)&pkt, sizeof(pkt) - 1);
 
   // 非阻塞发送

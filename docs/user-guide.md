@@ -6,9 +6,9 @@
 
 | 角色 | PlatformIO 环境 | 端口约定 | 作用 |
 |---|---|---|---|
-| 发射端/遥控器 | `transmitter` | COM3 | 读取摇杆、三档开关、按钮、电池信息，通过 ESP-NOW 发送控制数据 |
-| S3 高级发射端 | `s3_transmitter` | COM7 | 使用彩色触摸屏显示状态，兼容同一接收端协议 |
-| 接收端/接收机 | `receiver` | COM10 | 接收控制数据，输出 PWM/Servo 给 VESC，读取 VESC 电压和转速并回传 |
+| C3 基础版发射端/遥控器 | `transmitter` | COM5 | 读取摇杆、三档开关、按钮、电池信息，通过 ESP-NOW 发送控制数据 |
+| S3 高级发射端 | `s3_transmitter` | COM3 | 使用彩色触摸屏显示状态，兼容同一接收端协议 |
+| 接收端/接收机 | `receiver` | COM4 | 接收控制数据，输出 PWM/Servo 给 VESC，读取 VESC 电压和转速并回传 |
 
 ## 2. 正常使用步骤
 
@@ -66,10 +66,13 @@
 
 | 按钮 | 当前功能 |
 |---|---|
-| 按钮 1 | 进入/退出设置页面；进入设置页面后 throttle 强制为 0 |
+| 按钮 1 短按 | 进入/退出设置页面；进入设置页面后 throttle 强制为 0 |
+| 按钮 1 长按 3 秒 | 发送主动接管请求；不进入设置页面 |
 | 按钮 2 | 按下后接收端蜂鸣器响起；单次最长 3 秒，松开后可重新触发 |
 
 两个按钮按下时，发射端本地会短鸣作为按键提示。
+
+多遥控器同时开机时，接收端保持当前 active 控制源。另一台遥控器只有按钮1长按 3 秒发送接管请求后，才能切换控制权；切换时接收端先将输出归零，并重新等待 3 个合法控制包。
 
 ### 4.4 设置页面和摇杆校准
 
@@ -176,20 +179,23 @@ pio test -e native
 ```text
 pio run -e transmitter
 pio run -e receiver
+pio run -e s3_transmitter
 ```
 
 ### 9.3 上传固件
 
 ```text
-pio run -e transmitter -t upload --upload-port COM3
-pio run -e receiver -t upload --upload-port COM10
+pio run -e receiver -t upload --upload-port COM4
+pio run -e transmitter -t upload --upload-port COM5
+pio run -e s3_transmitter -t upload --upload-port COM3
 ```
 
 ### 9.4 串口查看
 
 ```text
+pio device monitor -p COM4 -b 115200
+pio device monitor -p COM5 -b 115200
 pio device monitor -p COM3 -b 115200
-pio device monitor -p COM10 -b 115200
 ```
 
 ## 10. 每次改代码后的固定流程
@@ -197,11 +203,12 @@ pio device monitor -p COM10 -b 115200
 1. 运行 `pio test -e native`。
 2. 运行 `pio run -e transmitter`。
 3. 运行 `pio run -e receiver`。
-4. 上传发射端到 COM3。
-5. 上传接收端到 COM10。
-6. 做相关硬件复测。
-7. 更新 `docs/progress.md`、`docs/bugs.md` 和 `docs/test-runs/`。
-8. 提交并推送到 GitHub。
+4. 上传接收端到 COM4。
+5. 上传 C3 基础版发射端到 COM5。
+6. 如本轮涉及 S3，上传 S3 发射端到 COM3。
+7. 做相关硬件复测。
+8. 更新 `docs/progress.md`、`docs/bugs.md` 和 `docs/test-runs/`。
+9. 提交并推送到 GitHub。
 
 ## 11. 常见问题
 

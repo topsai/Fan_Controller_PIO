@@ -219,6 +219,51 @@ void test_receiver_status_target_tracks_last_valid_transmitter() {
   TEST_ASSERT_EQUAL_UINT8_ARRAY(s3Mac, statusTarget, 6);
 }
 
+void test_controller_source_rejects_non_active_remote_without_takeover() {
+  const uint8_t activeMac[] = {0xAC, 0xEB, 0xE6, 0x44, 0xD5, 0x54};
+  const uint8_t otherMac[] = {0x48, 0xCA, 0x43, 0x9A, 0xA9, 0xB0};
+  ControllerSourceState state = {};
+  rememberActiveController(activeMac, state, false, 1000);
+
+  TEST_ASSERT_TRUE(controllerSourceIsActive(activeMac, state));
+  TEST_ASSERT_FALSE(controllerSourceAllowsPacket(otherMac, state, true, false));
+}
+
+void test_controller_source_allows_takeover_and_resets_stability() {
+  const uint8_t activeMac[] = {0xAC, 0xEB, 0xE6, 0x44, 0xD5, 0x54};
+  const uint8_t otherMac[] = {0x48, 0xCA, 0x43, 0x9A, 0xA9, 0xB0};
+  ControllerSourceState state = {};
+  rememberActiveController(activeMac, state, false, 1000);
+
+  TEST_ASSERT_TRUE(controllerSourceAllowsPacket(otherMac, state, true, true));
+  TEST_ASSERT_TRUE(controllerSourceShouldResetForTakeover(otherMac, state, true));
+  rememberActiveController(otherMac, state, false, 1500);
+  TEST_ASSERT_TRUE(controllerSourceIsActive(otherMac, state));
+}
+
+void test_controller_source_releases_after_timeout() {
+  const uint8_t activeMac[] = {0xAC, 0xEB, 0xE6, 0x44, 0xD5, 0x54};
+  const uint8_t otherMac[] = {0x48, 0xCA, 0x43, 0x9A, 0xA9, 0xB0};
+  ControllerSourceState state = {};
+  rememberActiveController(activeMac, state, false, 1000);
+
+  releaseActiveControllerIfTimedOut(state, 3001, 2000);
+  TEST_ASSERT_FALSE(state.hasActiveController);
+  TEST_ASSERT_TRUE(controllerSourceAllowsPacket(otherMac, state, false, false));
+}
+
+void test_button_short_press_and_long_press_are_distinct() {
+  ButtonLongPressState state = {};
+
+  TEST_ASSERT_EQUAL_INT(BUTTON_PRESS_NONE, buttonLongPressUpdate(true, 1000, 3000, state));
+  TEST_ASSERT_EQUAL_INT(BUTTON_PRESS_SHORT, buttonLongPressUpdate(false, 1800, 3000, state));
+
+  TEST_ASSERT_EQUAL_INT(BUTTON_PRESS_NONE, buttonLongPressUpdate(true, 5000, 3000, state));
+  TEST_ASSERT_EQUAL_INT(BUTTON_PRESS_NONE, buttonLongPressUpdate(true, 7999, 3000, state));
+  TEST_ASSERT_EQUAL_INT(BUTTON_PRESS_LONG, buttonLongPressUpdate(true, 8000, 3000, state));
+  TEST_ASSERT_EQUAL_INT(BUTTON_PRESS_NONE, buttonLongPressUpdate(false, 8200, 3000, state));
+}
+
 void test_protocol_crc8_detects_packet_changes() {
   const uint8_t payload[] = {0xA5, 0x01, CONTROL_PROTOCOL_VERSION, 0x34, 0x12, 0x00};
   const uint8_t crc = protocolCrc8(payload, sizeof(payload));
@@ -251,6 +296,11 @@ void test_protocol_status_flags_are_composable() {
   TEST_ASSERT_TRUE((flags & STATUS_FLAG_FAILSAFE) != 0);
   TEST_ASSERT_TRUE((flags & STATUS_FLAG_VESC_VALID) != 0);
   TEST_ASSERT_FALSE((flags & STATUS_FLAG_PROTOCOL_FAULT) != 0);
+}
+
+void test_protocol_control_takeover_flag_is_separate_from_status_lock_flag() {
+  TEST_ASSERT_EQUAL_UINT8(0x01, CONTROL_FLAG_TAKEOVER_REQUEST);
+  TEST_ASSERT_NOT_EQUAL(CONTROL_FLAG_TAKEOVER_REQUEST, STATUS_FLAG_OUTPUT_LOCKED);
 }
 
 void test_protocol_legacy_checksum_keeps_v1_packets_migratable() {
@@ -411,9 +461,14 @@ void setup() {
   RUN_TEST(test_s3_lvgl_display_dma_is_enabled);
   RUN_TEST(test_s3_espnow_link_uses_stable_radio_profile);
   RUN_TEST(test_receiver_status_target_tracks_last_valid_transmitter);
+  RUN_TEST(test_controller_source_rejects_non_active_remote_without_takeover);
+  RUN_TEST(test_controller_source_allows_takeover_and_resets_stability);
+  RUN_TEST(test_controller_source_releases_after_timeout);
+  RUN_TEST(test_button_short_press_and_long_press_are_distinct);
   RUN_TEST(test_protocol_crc8_detects_packet_changes);
   RUN_TEST(test_protocol_sequence_accepts_fresh_values_and_rejects_stale_replays);
   RUN_TEST(test_protocol_status_flags_are_composable);
+  RUN_TEST(test_protocol_control_takeover_flag_is_separate_from_status_lock_flag);
   RUN_TEST(test_protocol_legacy_checksum_keeps_v1_packets_migratable);
   RUN_TEST(test_diagnostic_duration_requires_explicit_long_flag_for_30_minutes);
   RUN_TEST(test_diagnostic_status_line_includes_role_and_counters);

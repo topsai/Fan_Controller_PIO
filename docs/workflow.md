@@ -8,8 +8,8 @@
 |---|---|---|
 | 1 | 修改代码 | 保持改动范围明确，避免混入无关重构 |
 | 2 | 运行自动测试 | 至少运行 `pio test -e native` |
-| 3 | 编译固件 | 运行 `pio run -e transmitter` 和 `pio run -e receiver` |
-| 4 | 上传固件 | 发射端上传到 COM3，接收端上传到 COM10 |
+| 3 | 编译固件 | 运行 `pio run -e transmitter`、`pio run -e receiver` 和 `pio run -e s3_transmitter` |
+| 4 | 上传固件 | 接收端 COM4，C3 基础版 COM5，S3 常用 COM3 |
 | 5 | 硬件验证 | 按 `docs/test-plan.md` 做相关功能复测 |
 | 6 | 完善文档 | 更新规格、参数、bug、测试记录或推进记录 |
 | 7 | 更新交接信息 | 如影响后续接手，更新 `docs/codex-handoff.md` |
@@ -29,13 +29,15 @@ pio test -e native
 ```text
 pio run -e transmitter
 pio run -e receiver
+pio run -e s3_transmitter
 ```
 
 ### 上传
 
 ```text
-pio run -e transmitter -t upload --upload-port COM3
-pio run -e receiver -t upload --upload-port COM10
+pio run -e receiver -t upload --upload-port COM4
+pio run -e transmitter -t upload --upload-port COM5
+pio run -e s3_transmitter -t upload --upload-port COM3
 ```
 
 ### Git
@@ -52,8 +54,10 @@ git push
 - [ ] `pio test -e native` 通过。
 - [ ] `pio run -e transmitter` 通过。
 - [ ] `pio run -e receiver` 通过。
-- [ ] 发射端新固件已上传到 COM3。
-- [ ] 接收端新固件已上传到 COM10。
+- [ ] `pio run -e s3_transmitter` 通过。
+- [ ] 接收端新固件已上传到 COM4。
+- [ ] C3 基础版新固件已上传到 COM5。
+- [ ] 如本次涉及 S3，S3 新固件已上传到 COM3。
 - [ ] 已完成本次改动相关的硬件验证。
 - [ ] `docs/progress.md` 已记录本次推进。
 - [ ] `docs/bugs.md` 已记录新发现或已修复问题。

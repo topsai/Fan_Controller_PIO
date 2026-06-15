@@ -12,6 +12,7 @@
    - `pio run -e s3_transmitter`
 4. 确认串口：
    - C3 接收端：当前按项目约定使用 `COM4`。
+   - C3 基础版发射端：当前按项目约定使用 `COM5`。
    - S3 高级发射端：按实际设备管理器显示的串口执行，历史常见为 `COM3`。
 
 ## 接收端升级
@@ -31,7 +32,7 @@ pio device monitor --port COM4 --baud 115200
 ## C3 基础发射端升级
 
 ```powershell
-pio run -e transmitter -t upload --upload-port <实际串口>
+pio run -e transmitter -t upload --upload-port COM5
 ```
 
 上传后确认 OLED 启动、摇杆居中或刹车保持解锁流程正常。
@@ -49,6 +50,7 @@ pio run -e s3_transmitter -t upload --upload-port <实际串口>
 - BMP280 显示气压/海拔。
 - MCU 温度显示类似 `43.2C`。
 - 摇杆校准值在重启后仍保留。
+- 按钮1短按进入/退出设置页，长按 3 秒发送主动接管请求。
 
 ## 回滚方式
 

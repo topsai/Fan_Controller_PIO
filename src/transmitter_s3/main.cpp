@@ -65,6 +65,8 @@ constexpr int THROTTLE_SLEW_STEP = 40;
 constexpr int JOYSTICK_CENTER_ADJUST_STEP = 10;
 constexpr uint8_t LOW_BATTERY_THRESHOLD = 20;
 constexpr uint8_t CRITICAL_BATTERY_THRESHOLD = 10;
+constexpr uint32_t TAKEOVER_LONG_PRESS_MS = 3000;
+constexpr uint32_t TAKEOVER_REQUEST_WINDOW_MS = 1000;
 
 #if S3_ESPNOW_TX_POWER_DBM_X4 >= 78
 constexpr wifi_power_t S3_ESPNOW_TX_POWER = WIFI_POWER_19_5dBm;
@@ -260,6 +262,8 @@ bool joystickCalibrateRequested = false;
 int16_t joystickCenterAdjust = 0;
 uint32_t armBrakeHoldStartMs = 0;
 bool armBrakeHolding = false;
+ButtonLongPressState button1LongPressState = {};
+uint32_t takeoverRequestUntilMs = 0;
 bool connected = false;
 uint32_t lastRecvTime = 0;
 int16_t rssiValue = -100;
@@ -637,16 +641,22 @@ void readInputs() {
     nextButtons |= 0x02;
   }
   static uint8_t lastButtons = 0;
-  static bool lastButton1Down = false;
-  if (button1Down && !lastButton1Down) {
+  const ButtonPressEvent button1Event = buttonLongPressUpdate(button1Down, millis(), TAKEOVER_LONG_PRESS_MS, button1LongPressState);
+  if (button1Event == BUTTON_PRESS_SHORT) {
     settingsMode = !settingsMode;
     markUserActivity();
     transmitterArmed = false;
     armBrakeHolding = false;
     joystickValue = 0;
     beep(BEEP_FREQ_BUTTON, 50);
+  } else if (button1Event == BUTTON_PRESS_LONG) {
+    takeoverRequestUntilMs = millis() + TAKEOVER_REQUEST_WINDOW_MS;
+    markUserActivity();
+    transmitterArmed = false;
+    armBrakeHolding = false;
+    joystickValue = 0;
+    beep(BEEP_FREQ_CONNECTED, 80);
   }
-  lastButton1Down = button1Down;
 
   if ((nextButtons & ~lastButtons) != 0 && !settingsMode) {
     markUserActivity();
@@ -816,6 +826,9 @@ void sendControlPacket() {
   pkt.speedLevel = speedLevel;
   pkt.buttons = buttonState;
   pkt.flags = transmitterArmed ? 0 : STATUS_FLAG_OUTPUT_LOCKED;
+  if (millis() < takeoverRequestUntilMs) {
+    pkt.flags |= CONTROL_FLAG_TAKEOVER_REQUEST;
+  }
   pkt.crc = protocolCrc8((const uint8_t *)&pkt, sizeof(pkt) - 1);
   esp_now_send(receiverMac, (const uint8_t *)&pkt, sizeof(pkt));
 }

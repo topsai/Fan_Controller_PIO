@@ -37,10 +37,10 @@ git status -sb
 
 ## 当前项目状态记录
 
-截至 2026-06-14，本地 `main` 分支已跟踪 `origin/main`，最近一次已同步提交为：
+截至 2026-06-15，本地 `main` 分支跟踪 `origin/main`。换电脑后以 GitHub 上最新 `main` 为准：
 
 ```text
-e22bcd5 fix: decouple s3 control transmission
+git pull
 ```
 
 当前代码和文档已经覆盖：
@@ -50,6 +50,7 @@ e22bcd5 fix: decouple s3 control transmission
 - ESP32-S3R8 触摸屏高级发射端。
 - SquareLine Studio 工程和导出后的 LVGL 代码。
 - 原生单元测试、硬件上传记录和实测记录。
+- 多遥控器主动接管：非 active 遥控器按钮1长按 3 秒才可抢占，短按仍进入/退出设置页。
 
 当前已知需要继续人工观察或复测的重点：
 
@@ -63,9 +64,9 @@ e22bcd5 fix: decouple s3 control transmission
 
 | 项目 | 当前常用值 | 说明 |
 |---|---|---|
-| C3 发射端上传口 | `COM3` | 换电脑后可能变化 |
-| C3 接收端上传口 | `COM10` | 换电脑后可能变化 |
-| S3 高级发射端上传口 | `COM7` | 换电脑后可能变化 |
+| C3 基础版发射端上传口 | `COM5` | 换电脑后可能变化 |
+| C3 接收端上传口 | `COM4` | 换电脑后可能变化 |
+| S3 高级发射端上传口 | `COM3` | 换电脑后可能变化 |
 | PlatformIO 构建目录 | `.pio/` | 本地生成，不提交 |
 | VS Code 项目配置 | `.vscode/extensions.json`、`.vscode/settings.json` | 可提交项目通用设置，不写本机绝对路径 |
 | VS Code 本机生成配置 | `.vscode/c_cpp_properties.json`、`.vscode/launch.json` | PlatformIO 自动生成，含本机路径，不提交 |

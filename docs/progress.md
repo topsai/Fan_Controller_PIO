@@ -1199,3 +1199,37 @@ S3 页面上的本机电量和 BMP280 气压/海拔偶发变成 `0` 或无效显
 - `pio test -e native`：当前 Windows 环境缺少 `gcc/g++`，native 测试未能启动，失败点是工具链不可用，不是断言失败。
 - `pio run -e s3_transmitter`：通过。
 - `pio run -e s3_transmitter -t upload --upload-port COM3`：通过，已写入 COM3 上的 ESP32-S3。
+
+## 2026-06-15 基础版 COM5 同步和多遥控器主动接管
+
+### 目标
+
+把基础版 C3 遥控器 `COM5` 同步到当前 v2 协议，并实现多遥控器主动接管：接收端保持当前 active 控制源，另一台遥控器必须按钮1长按 3 秒发送接管请求，普通控制包不能自动抢占。
+
+### 已修改
+
+- `include/protocol.h` 新增 `CONTROL_FLAG_TAKEOVER_REQUEST`。
+- `include/control_logic.h` 新增 active 控制源选择 helper 和按钮短按/长按分流 helper。
+- 接收端新增 active 控制源锁定、ignored 诊断计数、接管时输出归零和 3 包稳定门限重置。
+- 接收端新增 `DIAG SIMCTRLFROM <c3|s3> ...`，用于模拟指定遥控器来源。
+- C3 基础版和 S3 按钮1行为调整为：短按进入/退出设置页，长按 3 秒发送约 1 秒接管请求且不进入设置页。
+- `tools/diagnostics/link_test.py` 新增多遥控器切换测试入口，并让单遥控器测试按实际 role 注入 `c3` 或 `s3` 来源。
+- 更新协议、连通性、回归矩阵、升级流程、用户指南、工作流和 Codex 交接文档中的 COM4/COM5/COM3 口径。
+
+### 验证
+
+- `python -m py_compile tools/diagnostics/link_test.py`：通过。
+- `pio test -e native`：通过，46/46 PASS。
+- `pio run -e receiver`：通过。
+- `pio run -e transmitter`：通过。
+- `pio run -e s3_transmitter`：通过。
+- `pio run -e receiver -t upload --upload-port COM4`：通过。
+- `pio run -e transmitter -t upload --upload-port COM5`：通过。
+- `pio run -e s3_transmitter -t upload --upload-port COM3`：通过。
+- `python tools/diagnostics/link_test.py --receiver-port COM4 --remote-port COM5`：通过，10 秒。
+- `python tools/diagnostics/link_test.py --receiver-port COM4 --remote-port COM3`：通过，10 秒。
+- `python tools/diagnostics/link_test.py --receiver-port COM4 --remote-a COM5 --remote-b COM3`：通过，短切换测试。
+
+### 未执行
+
+- 30 分钟稳定性测试未执行；按规则只在显式 `--long` 时运行。

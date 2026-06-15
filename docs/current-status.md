@@ -20,19 +20,22 @@
 - ESP-NOW 控制协议已升级到 v2，使用版本号、CRC-8 和序号防重放。
 - 接收端兼容旧 v1 遥控器包；只升级接收端时不会再因为 v1/v2 包长不同而完全断联。
 - 接收端在连续 3 个合法控制包后才应用输出，协议错误或失控时进入保守安全状态。
+- 接收端已支持多遥控器 active 控制源锁定；非 active 遥控器必须按钮1长按 3 秒发送接管请求才可切换。
 - S3 摇杆校准持久化到 NVS，重启后保留。
 - S3 主界面已经绑定 Compass、BMP280、MCU 温度和核心状态。
 - S3 诊断数据已经准备好，后续 UI 添加控件即可继续绑定。
 - 接收端当前约定端口为 COM4。
+- C3 基础版遥控器当前约定端口为 COM5。
+- S3 高级遥控器当前常用端口为 COM3。
 - 已新增串口诊断注入测试脚本，10 秒默认运行，30 分钟稳定性测试必须手动 `--long` 触发。
 
 ## 本轮验证结果
 
-- `pio test -e native`：PASS，39/39。
+- `pio test -e native`：PASS，46/46。
 - `pio run -e transmitter`：SUCCESS。
 - `pio run -e receiver`：SUCCESS。
 - `pio run -e s3_transmitter`：SUCCESS。
-- `pio run -e receiver -t upload --upload-port COM4`：SUCCESS，设备 MAC `AC:EB:E6:44:C5:90`。
+- 本轮上传和串口连通性结果见最新 `docs/test-runs/` 记录。
 
 ## UI 后续添加
 
@@ -52,5 +55,6 @@
 见 `docs/connectivity-test.md`。常用 10 秒测试：
 
 ```powershell
-python tools/diagnostics/link_test.py --receiver-port COM4 --remote-port COM3
+python tools/diagnostics/link_test.py --receiver-port COM4 --remote-port COM5
+python tools/diagnostics/link_test.py --receiver-port COM4 --remote-a COM5 --remote-b COM3
 ```

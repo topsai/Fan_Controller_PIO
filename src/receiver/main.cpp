@@ -124,6 +124,8 @@ uint8_t stableControlPacketCount = 0;
 uint32_t diagnosticReceivedPackets = 0;
 uint32_t diagnosticLostPackets = 0;
 uint32_t diagnosticFaultCount = 0;
+uint32_t diagnosticIgnoredPackets = 0;
+ControllerSourceState controllerSource = {};
 
 int16_t smoothedThrottle = 0;
 int16_t lastPwmValue = -1;
@@ -147,6 +149,113 @@ const int pwmChannels[] = { 0, 1, 2, 3 };
 
 bool isBoundTransmitter(const uint8_t *mac) {
   return memcmp(mac, transmitterMac, 6) == 0 || memcmp(mac, s3TransmitterMac, 6) == 0;
+}
+
+const char *controllerNameForMac(const uint8_t *mac) {
+  if (controllerMacEquals(mac, transmitterMac)) {
+    return "c3";
+  }
+  if (controllerMacEquals(mac, s3TransmitterMac)) {
+    return "s3";
+  }
+  return "unknown";
+}
+
+const uint8_t *macForControllerName(const char *name) {
+  if (strcmp(name, "c3") == 0 || strcmp(name, "transmitter") == 0 || strcmp(name, "a") == 0) {
+    return transmitterMac;
+  }
+  if (strcmp(name, "s3") == 0 || strcmp(name, "s3_transmitter") == 0 || strcmp(name, "b") == 0) {
+    return s3TransmitterMac;
+  }
+  return nullptr;
+}
+
+void zeroReceiverOutputForSourceSwitch() {
+  throttle = 0;
+  speedLevel = 1;
+  buttons = 0;
+  smoothedThrottle = 0;
+  stableControlPacketCount = 0;
+  sourceOutputLocked = true;
+}
+
+bool activeControllerIsOnline(uint32_t nowMs) {
+  return controllerSource.hasActiveController &&
+         nowMs - controllerSource.lastSeenMs <= FAILSAFE_TIMEOUT &&
+         !failsafeActive;
+}
+
+void applyControlPacketFromSource(
+  const uint8_t *mac,
+  int16_t receivedThrottle,
+  uint8_t receivedSpeedLevel,
+  uint8_t receivedButtons,
+  uint8_t receivedFlags,
+  bool legacyPacket,
+  bool hasSequence,
+  uint16_t receivedSequence
+) {
+  if (!isBoundTransmitter(mac)) {
+    return;
+  }
+
+  const uint32_t nowMs = millis();
+  releaseActiveControllerIfTimedOut(controllerSource, nowMs, FAILSAFE_TIMEOUT);
+
+  const bool takeoverRequested = !legacyPacket && ((receivedFlags & CONTROL_FLAG_TAKEOVER_REQUEST) != 0);
+  const bool wasActive = controllerSourceIsActive(mac, controllerSource);
+  const bool activeOnline = activeControllerIsOnline(nowMs);
+  if (!controllerSourceAllowsPacket(mac, controllerSource, activeOnline, takeoverRequested)) {
+    diagnosticIgnoredPackets++;
+    return;
+  }
+
+  const bool resetForNewSource = !wasActive || controllerSourceShouldResetForTakeover(mac, controllerSource, takeoverRequested);
+  if (resetForNewSource) {
+    zeroReceiverOutputForSourceSwitch();
+    hasControlSequence = false;
+  }
+
+  if (hasSequence) {
+    if (!protocolSequenceIsFresh(receivedSequence, lastControlSequence, hasControlSequence)) {
+      protocolFault = true;
+      diagnosticFaultCount++;
+      return;
+    }
+    protocolRememberSequence(receivedSequence, lastControlSequence, hasControlSequence);
+  }
+
+  const bool signalConnectionSuccess = shouldSignalReceiverConnectionSuccess(connected, failsafeActive);
+
+  rememberActiveController(mac, controllerSource, legacyPacket, nowMs);
+  rememberStatusTarget(mac, statusTargetMac, hasStatusTarget);
+  statusTargetUsesLegacyProtocol = legacyPacket;
+  sourceOutputLocked = legacyPacket ? false : (receivedFlags & STATUS_FLAG_OUTPUT_LOCKED) != 0;
+  if (stableControlPacketCount < 3) {
+    stableControlPacketCount++;
+  }
+  if (stableControlPacketCount < 3) {
+    throttle = 0;
+    speedLevel = 1;
+    buttons = 0;
+    lastRecvTime = nowMs;
+    protocolFault = false;
+    return;
+  }
+  throttle = receivedThrottle;
+  speedLevel = receivedSpeedLevel;
+  buttons = receivedButtons;
+  diagnosticReceivedPackets++;
+  lastRecvTime = nowMs;
+  connected = true;
+  failsafeActive = false;
+  protocolFault = false;
+  if (signalConnectionSuccess) {
+    connectionBeepPending = true;
+  }
+
+  digitalWrite(LED_STATUS, !digitalRead(LED_STATUS));
 }
 
 // ========== 硬件定时器中断 ==========
@@ -247,6 +356,8 @@ void setupESPNOW() {
     uint8_t receivedButtons = 0;
     uint8_t receivedFlags = 0;
     bool legacyPacket = false;
+    bool hasSequence = false;
+    uint16_t receivedSequence = 0;
 
     if (len == sizeof(ControlPacket)) {
       ControlPacket *pkt = (ControlPacket *)data;
@@ -261,12 +372,8 @@ void setupESPNOW() {
         diagnosticFaultCount++;
         return;
       }
-      if (!protocolSequenceIsFresh(pkt->sequence, lastControlSequence, hasControlSequence)) {
-        protocolFault = true;
-        diagnosticFaultCount++;
-        return;
-      }
-      protocolRememberSequence(pkt->sequence, lastControlSequence, hasControlSequence);
+      hasSequence = true;
+      receivedSequence = pkt->sequence;
       receivedThrottle = pkt->throttle;
       receivedSpeedLevel = pkt->speedLevel;
       receivedButtons = pkt->buttons;
@@ -289,37 +396,15 @@ void setupESPNOW() {
       return;
     }
 
-    const bool signalConnectionSuccess = shouldSignalReceiverConnectionSuccess(connected, failsafeActive);
-
-    // 更新数据
-    rememberStatusTarget(mac, statusTargetMac, hasStatusTarget);
-    statusTargetUsesLegacyProtocol = legacyPacket;
-    sourceOutputLocked = legacyPacket ? false : (receivedFlags & STATUS_FLAG_OUTPUT_LOCKED) != 0;
-    if (stableControlPacketCount < 3) {
-      stableControlPacketCount++;
-    }
-    if (stableControlPacketCount < 3) {
-      throttle = 0;
-      speedLevel = 1;
-      buttons = 0;
-      lastRecvTime = millis();
-      protocolFault = false;
-      return;
-    }
-    throttle = receivedThrottle;
-    speedLevel = receivedSpeedLevel;
-    buttons = receivedButtons;
-    diagnosticReceivedPackets++;
+    applyControlPacketFromSource(mac,
+                                 receivedThrottle,
+                                 receivedSpeedLevel,
+                                 receivedButtons,
+                                 receivedFlags,
+                                 legacyPacket,
+                                 hasSequence,
+                                 receivedSequence);
     lastRssi = WiFi.RSSI();
-    lastRecvTime = millis();
-    connected = true;
-    failsafeActive = false;
-    protocolFault = false;
-    if (signalConnectionSuccess) {
-      connectionBeepPending = true;
-    }
-
-    digitalWrite(LED_STATUS, !digitalRead(LED_STATUS));
   });
 
   // 发送回调
@@ -398,6 +483,8 @@ void checkFailsafe() {
     connected = safeState.connected;
     failsafeActive = safeState.failsafeActive;
     stableControlPacketCount = 0;
+    controllerSource.hasActiveController = false;
+    hasControlSequence = false;
     sourceOutputLocked = true;
     failsafeBeepUntil = millis() + 1000;
     Serial.println("失控保护启动！");
@@ -505,7 +592,7 @@ void sendTelemetry() {
 }
 
 void printDiagnosticStatus() {
-  char line[96] = {};
+  char line[160] = {};
   diagnosticFormatStatusLine(line,
                              sizeof(line),
                              "receiver",
@@ -513,7 +600,10 @@ void printDiagnosticStatus() {
                              diagnosticReceivedPackets,
                              diagnosticLostPackets,
                              diagnosticFaultCount);
-  Serial.println(line);
+  Serial.printf("%s ignored=%lu active=%s\n",
+                line,
+                (unsigned long)diagnosticIgnoredPackets,
+                controllerSource.hasActiveController ? controllerNameForMac(controllerSource.activeMac) : "none");
 }
 
 void handleDiagnosticCommand(const String &line) {
@@ -535,17 +625,45 @@ void handleDiagnosticCommand(const String &line) {
       diagnosticFaultCount++;
       return;
     }
-    throttle = (int16_t)clampInt(throttleValue, -1000, 1000);
-    speedLevel = (uint8_t)clampInt(speedValue, 1, 3);
-    buttons = (uint8_t)clampInt(buttonValue, 0, 255);
-    sourceOutputLocked = (flagValue & STATUS_FLAG_OUTPUT_LOCKED) != 0;
-    stableControlPacketCount = 3;
-    connected = true;
-    failsafeActive = false;
-    protocolFault = false;
-    lastRecvTime = millis();
-    diagnosticReceivedPackets++;
+    for (uint8_t i = 0; i < 3; i++) {
+      applyControlPacketFromSource(transmitterMac,
+                                   (int16_t)clampInt(throttleValue, -1000, 1000),
+                                   (uint8_t)clampInt(speedValue, 1, 3),
+                                   (uint8_t)clampInt(buttonValue, 0, 255),
+                                   (uint8_t)clampInt(flagValue, 0, 255),
+                                   false,
+                                   false,
+                                   0);
+    }
     Serial.println("DIAG OK simctrl");
+    return;
+  }
+  if (line.startsWith("DIAG SIMCTRLFROM ")) {
+    char sourceName[20] = {};
+    int throttleValue = 0;
+    int speedValue = 1;
+    int buttonValue = 0;
+    int flagValue = 0;
+    if (sscanf(line.c_str(), "DIAG SIMCTRLFROM %19s %d %d %d %d", sourceName, &throttleValue, &speedValue, &buttonValue, &flagValue) != 5) {
+      Serial.println("DIAG ERR simctrlfrom");
+      diagnosticFaultCount++;
+      return;
+    }
+    const uint8_t *sourceMac = macForControllerName(sourceName);
+    if (sourceMac == nullptr) {
+      Serial.println("DIAG ERR source");
+      diagnosticFaultCount++;
+      return;
+    }
+    applyControlPacketFromSource(sourceMac,
+                                 (int16_t)clampInt(throttleValue, -1000, 1000),
+                                 (uint8_t)clampInt(speedValue, 1, 3),
+                                 (uint8_t)clampInt(buttonValue, 0, 255),
+                                 (uint8_t)clampInt(flagValue, 0, 255),
+                                 false,
+                                 false,
+                                 0);
+    Serial.println("DIAG OK simctrlfrom");
     return;
   }
   if (line.length() > 0) {

@@ -11,6 +11,8 @@ static constexpr uint8_t STATUS_PROTOCOL_VERSION = 2;
 static constexpr uint8_t LEGACY_CONTROL_PACKET_SIZE = 7;
 static constexpr uint8_t LEGACY_STATUS_PACKET_SIZE = 14;
 
+static constexpr uint8_t CONTROL_FLAG_TAKEOVER_REQUEST = 0x01;
+
 static constexpr uint8_t STATUS_FLAG_FAILSAFE = 0x01;
 static constexpr uint8_t STATUS_FLAG_VESC_VALID = 0x02;
 static constexpr uint8_t STATUS_FLAG_PROTOCOL_FAULT = 0x04;
