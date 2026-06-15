@@ -53,7 +53,8 @@ git pull
 - 原生单元测试、硬件上传记录和实测记录。
 - 多遥控器主动接管：非 active 遥控器按钮1长按 3 秒才可抢占，短按仍进入/退出设置页。
 - S3 UI 固件侧产品化绑定：主屏、诊断页、校准页、系统页对象名已稳定；缺失组件会自动跳过。
-- S3 新硬件引脚已按 `hardware/` 原理图适配到固件，档位输入改为 `GPIO2` ADC 电阻分压。
+- 当前 COM3 实物继续使用 `s3_transmitter` 环境和旧 S3 引脚。
+- 新版本未打板 PCB 使用 `s3_transmitter_new_pcb` 环境，档位输入为 `GPIO2` ADC 电阻分压。
 
 当前已知需要继续人工观察或复测的重点：
 
@@ -72,6 +73,8 @@ git pull
 | C3 基础版发射端上传口 | `COM5` | 换电脑后可能变化 |
 | C3 接收端上传口 | `COM4` | 换电脑后可能变化 |
 | S3 高级发射端上传口 | `COM3` | 换电脑后可能变化 |
+| 当前 S3 实物编译环境 | `s3_transmitter` | 不要用新 PCB 环境烧录当前 COM3 旧板 |
+| 新版本 S3 PCB 编译环境 | `s3_transmitter_new_pcb` | 仅新 PCB 打板后使用 |
 | PlatformIO 构建目录 | `.pio/` | 本地生成，不提交 |
 | VS Code 项目配置 | `.vscode/extensions.json`、`.vscode/settings.json` | 可提交项目通用设置，不写本机绝对路径 |
 | VS Code 本机生成配置 | `.vscode/c_cpp_properties.json`、`.vscode/launch.json` | PlatformIO 自动生成，含本机路径，不提交 |

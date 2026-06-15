@@ -6,7 +6,10 @@
 |---|---|---|
 | 编译发射端 | `pio run -e transmitter` | 编译通过 |
 | 编译接收端 | `pio run -e receiver` | 编译通过 |
-| 清理后全量编译 | `pio run -t clean && pio run` | 两个环境均通过 |
+| 编译 S3 当前实物遥控器 | `pio run -e s3_transmitter` | 编译通过 |
+| 编译 S3 新 PCB 遥控器 | `pio run -e s3_transmitter_new_pcb` | 编译通过 |
+| 原生单元测试 | `pio test -e native` | 全部 PASS |
+| 默认环境编译 | `pio run` | 默认 C3 发射端和接收端通过 |
 
 ## 2. 烧录测试
 
@@ -14,6 +17,11 @@
 |---|---|---|
 | 发射端 | `pio run -e transmitter -t upload` | 烧录成功，串口输出启动信息 |
 | 接收端 | `pio run -e receiver -t upload` | 烧录成功，串口输出启动信息 |
+| 接收端 COM4 | `pio run -e receiver -t upload --upload-port COM4` | 烧录成功 |
+| 基础版遥控器 COM5 | `pio run -e transmitter -t upload --upload-port COM5` | 烧录成功 |
+| 当前 S3 遥控器 COM3 | `pio run -e s3_transmitter -t upload --upload-port COM3` | 烧录成功 |
+
+注意：`s3_transmitter` 是当前 COM3 实物环境；`s3_transmitter_new_pcb` 只用于新版本 S3 PCB 打板后烧录，不要烧到当前 COM3 旧板。
 
 ## 3. 发射端单板测试
 
@@ -52,6 +60,20 @@
 | INT-09 | 恢复连接 | 重新打开被关闭的一端 | 自动恢复连接和正常控制 |
 
 ## 6. 回归测试触发条件
+
+## 6. 自动诊断连通性测试
+
+| 编号 | 命令 | 期望 |
+|---|---|---|
+| DIAG-01 | `python tools/diagnostics/link_test.py --receiver-port COM4 --remote-port COM5` | 基础版 10 秒连通，`PASS duration=10s` |
+| DIAG-02 | `python tools/diagnostics/link_test.py --receiver-port COM4 --remote-port COM3` | S3 10 秒连通，`PASS duration=10s` |
+| DIAG-03 | `python tools/diagnostics/link_test.py --receiver-port COM4 --remote-a COM5 --remote-b COM3` | 多遥控器主动接管切换通过 |
+| DIAG-04 | `python tools/diagnostics/link_test.py --receiver-port COM4 --remote-port COM5 --long` | 基础版 30 分钟稳定性，仅手动指定时执行 |
+| DIAG-05 | `python tools/diagnostics/link_test.py --receiver-port COM4 --remote-port COM3 --long` | S3 30 分钟稳定性，仅手动指定时执行 |
+
+涉及协议、引脚、S3 启动流程、诊断命令、串口初始化、ESP-NOW 发送任务的变更，不能只做编译测试；必须至少执行 DIAG-01、DIAG-02 和 DIAG-03。
+
+## 7. 回归测试触发条件
 
 以下变更后必须执行联调测试：
 

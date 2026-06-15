@@ -1264,6 +1264,43 @@ S3 页面上的本机电量和 BMP280 气压/海拔偶发变成 `0` 或无效显
 - `GPIO0`、`GPIO45`、`GPIO46` 属于启动/Strapping 相关敏感脚，固件已按当前原理图适配，但打板前仍建议复核上下拉和上电默认电平。
 - 档位 ADC 阈值当前按三等分 `0..4095` 处理；实物电阻误差较大时需要根据串口或 `ui_LabelSpeedAdc` 读数微调阈值。
 
+## 2026-06-15 S3 完整硬件测试和新 PCB 环境拆分
+
+### 现象
+
+用户要求补做完整测试。补跑 COM3 S3 连通性时，`link_test.py` 可以看到 S3 启动日志，但 `DIAG PING` 无响应。原因是上一轮把 `s3_transmitter` 默认引脚切到了新版本未打板 PCB，当前 COM3 实物仍是旧 S3 开发板引脚，导致固件不能完整进入诊断循环。
+
+### 已修改
+
+- `s3_transmitter` 默认恢复当前 COM3 实物引脚：
+  - LCD 电源 `GPIO41`，TE `GPIO47`。
+  - AUX I2C `GPIO18/GPIO19`。
+  - 档位为 `GPIO37/GPIO38/GPIO39` 三路数字输入。
+  - 按钮 `GPIO35/GPIO36`，蜂鸣器 `GPIO42`。
+- 新增 `s3_transmitter_new_pcb` PlatformIO 环境，使用 `-DS3_NEW_PCB_PINOUT=1` 编译新 PCB 引脚：
+  - LCD 电源 `GPIO47`，TE `GPIO37`。
+  - AUX I2C `GPIO39/GPIO38`。
+  - 档位为 `GPIO2` ADC 电阻分压。
+  - 按钮 `GPIO0/GPIO46`，蜂鸣器 `GPIO40`。
+
+### 验证
+
+- `pio test -e native`：通过，50/50 PASS。
+- `pio run -e transmitter`：通过。
+- `pio run -e receiver`：通过。
+- `pio run -e s3_transmitter`：通过。
+- `pio run -e s3_transmitter_new_pcb`：通过。
+- `pio run -e receiver -t upload --upload-port COM4`：通过。
+- `pio run -e transmitter -t upload --upload-port COM5`：通过。
+- `pio run -e s3_transmitter -t upload --upload-port COM3`：通过。
+- `python tools/diagnostics/link_test.py --receiver-port COM4 --remote-port COM3`：通过，10 秒。
+- `python tools/diagnostics/link_test.py --receiver-port COM4 --remote-port COM5`：通过，10 秒。
+- `python tools/diagnostics/link_test.py --receiver-port COM4 --remote-a COM5 --remote-b COM3`：通过，10 秒切换测试。
+
+### 结论
+
+当前 COM3 实物继续使用 `s3_transmitter`。新版本 PCB 打板后再使用 `s3_transmitter_new_pcb` 烧录和验证。后续涉及硬件引脚变更时，必须同时跑 COM3 真实连通性测试，不能只凭编译通过确认。
+
 ### 未执行
 
 - 30 分钟稳定性测试未执行；按规则只在显式 `--long` 时运行。

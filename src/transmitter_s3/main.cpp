@@ -19,6 +19,7 @@ namespace {
 
 constexpr const char *S3_FIRMWARE_VERSION = "s3-remote-ui";
 
+#if defined(S3_NEW_PCB_PINOUT) && S3_NEW_PCB_PINOUT
 constexpr int LCD_POWER_PIN = 47;
 constexpr int LCD_POWER_ACTIVE_LEVEL = LOW;
 constexpr int LCD_TE_PIN = 37;
@@ -33,6 +34,24 @@ constexpr int SPEED_LEVEL_ADC_PIN = 2;
 constexpr int BUTTON_1_PIN = 0;
 constexpr int BUTTON_2_PIN = 46;
 constexpr int BUZZER_PIN = 40;
+#else
+constexpr int LCD_POWER_PIN = 41;
+constexpr int LCD_POWER_ACTIVE_LEVEL = LOW;
+constexpr int LCD_TE_PIN = 47;
+constexpr int LCD_RST_PIN = 8;
+
+constexpr int AUX_I2C_SDA_PIN = 18;
+constexpr int AUX_I2C_SCL_PIN = 19;
+constexpr uint32_t AUX_I2C_FREQ_HZ = 300000;
+
+constexpr int JOYSTICK_PIN = 1;
+constexpr int SWITCH_PIN_1 = 37;
+constexpr int SWITCH_PIN_2 = 38;
+constexpr int SWITCH_PIN_3 = 39;
+constexpr int BUTTON_1_PIN = 35;
+constexpr int BUTTON_2_PIN = 36;
+constexpr int BUZZER_PIN = 42;
+#endif
 
 constexpr uint8_t RECEIVER_MAC[] = {0xAC, 0xEB, 0xE6, 0x44, 0xC5, 0x90};
 constexpr uint8_t CW2015_ADDR = 0x62;
@@ -588,7 +607,13 @@ void readLocalSensors() {
 }
 
 void setupPins() {
+#if defined(S3_NEW_PCB_PINOUT) && S3_NEW_PCB_PINOUT
   pinMode(SPEED_LEVEL_ADC_PIN, INPUT);
+#else
+  pinMode(SWITCH_PIN_1, INPUT_PULLUP);
+  pinMode(SWITCH_PIN_2, INPUT_PULLUP);
+  pinMode(SWITCH_PIN_3, INPUT_PULLUP);
+#endif
   pinMode(BUTTON_1_PIN, INPUT_PULLUP);
   pinMode(BUTTON_2_PIN, INPUT_PULLUP);
   pinMode(BUZZER_PIN, OUTPUT);
@@ -630,8 +655,22 @@ void readInputs() {
   const int16_t safeTarget = settingsMode ? 0 : safeThrottleForArming(targetThrottle, transmitterArmed);
   joystickValue = slewLimitedThrottle(joystickValue, safeTarget, THROTTLE_SLEW_STEP);
 
+#if defined(S3_NEW_PCB_PINOUT) && S3_NEW_PCB_PINOUT
   speedAdcRaw = (uint16_t)analogRead(SPEED_LEVEL_ADC_PIN);
   speedLevel = s3SpeedLevelFromAdc(speedAdcRaw);
+#else
+  const bool sw1 = !digitalRead(SWITCH_PIN_1);
+  const bool sw2 = !digitalRead(SWITCH_PIN_2);
+  const bool sw3 = !digitalRead(SWITCH_PIN_3);
+  speedAdcRaw = sw3 ? 4095 : (sw2 ? 2048 : (sw1 ? 0 : 0));
+  if (sw3) {
+    speedLevel = 3;
+  } else if (sw2) {
+    speedLevel = 2;
+  } else {
+    speedLevel = 1;
+  }
+#endif
 
   uint8_t nextButtons = 0;
   const bool button1Down = !digitalRead(BUTTON_1_PIN);
