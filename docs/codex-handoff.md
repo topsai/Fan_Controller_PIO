@@ -33,6 +33,7 @@ git status -sb
 |---|---|
 | `docs/ui-workflow.md` | SquareLine 工程、导出目录、生成代码边界 |
 | `docs/squareline-data-binding.md` | UI 控件命名、数据绑定和适配层规则 |
+| `docs/s3-ui-final-components.md` | S3 最终页面和组件对象名清单 |
 | `docs/superpowers/plans/` | 已有阶段计划和 UI/硬件推进思路 |
 
 ## 当前项目状态记录
@@ -51,10 +52,14 @@ git pull
 - SquareLine Studio 工程和导出后的 LVGL 代码。
 - 原生单元测试、硬件上传记录和实测记录。
 - 多遥控器主动接管：非 active 遥控器按钮1长按 3 秒才可抢占，短按仍进入/退出设置页。
+- S3 UI 固件侧产品化绑定：主屏、诊断页、校准页、系统页对象名已稳定；缺失组件会自动跳过。
+- S3 新硬件引脚已按 `hardware/` 原理图适配到固件，档位输入改为 `GPIO2` ADC 电阻分压。
 
 当前已知需要继续人工观察或复测的重点：
 
-- S3 实物 UI 显示效果，包括 BMP280、电量、状态文字和颜色是否稳定。
+- S3 实物 UI 显示效果，包括 BMP280、电量、状态文字、指南针、MCU 温度和颜色是否稳定。
+- S3 新硬件打板前复核 `GPIO0`、`GPIO45`、`GPIO46` 上下拉和上电默认电平。
+- 档位 ADC 阈值需要在实物上根据 `ui_LabelSpeedAdc` 或串口读数确认。
 - S3 间歇性断联修复后的长期运行稳定性。
 - `docs/bugs.md` 中状态为 `Watch` 或 `Open` 的条目。
 
@@ -85,7 +90,7 @@ git pull
 如果任务和 S3 UI 有关，再补一句：
 
 ```text
-这次任务涉及 S3 UI，请同时阅读 docs/ui-workflow.md 和 docs/squareline-data-binding.md。
+这次任务涉及 S3 UI，请同时阅读 docs/ui-workflow.md、docs/squareline-data-binding.md 和 docs/s3-ui-final-components.md。
 ```
 
 ## 每次阶段性结束前

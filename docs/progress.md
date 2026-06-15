@@ -1230,6 +1230,40 @@ S3 页面上的本机电量和 BMP280 气压/海拔偶发变成 `0` 或无效显
 - `python tools/diagnostics/link_test.py --receiver-port COM4 --remote-port COM3`：通过，10 秒。
 - `python tools/diagnostics/link_test.py --receiver-port COM4 --remote-a COM5 --remote-b COM3`：通过，短切换测试。
 
+## 2026-06-15 S3 UI 固件功能补齐
+
+### 目标
+
+把 S3 高级遥控器的 UI 功能做成“页面组件后补即可工作”的状态：主屏继续可用，诊断页、校准页、系统页的对象名提前稳定绑定；同时同步新硬件原理图中的 S3 引脚和档位电阻分压输入。
+
+### 已修改
+
+- S3 硬件引脚按新原理图同步：
+  - LCD 电源 `GPIO47`，TE `GPIO37`，RST `GPIO8`。
+  - AUX I2C 改为 `SDA GPIO39` / `SCL GPIO38`。
+  - 摇杆 `GPIO1`。
+  - 档位由 3 个数字输入改为 `GPIO2` ADC 电阻分压。
+  - 按钮1 `GPIO0`，按钮2 `GPIO46`，蜂鸣器 `GPIO40`。
+- `include/s3_ui_bindings.h` 新增主状态、协议、序号、VESC、传感器、摇杆、固件、亮度、电源模式、升级提示和档位 ADC helper。
+- `src/transmitter_s3/ui/ui.cpp` 新增可选 SquareLine 对象绑定；未创建对象时自动跳过，不影响编译。
+- 诊断页支持显示链路质量、接收端 flags、协议版本、TX/RX 序号、VESC 状态、传感器状态。
+- 校准页支持显示摇杆中心、原始 ADC、输出、校准范围、档位 ADC，并支持校准、中心 -10、中心 +10、恢复默认。
+- 系统页支持显示固件版本、背光亮度、电源模式、USB 刷机提示；`ui_SliderBrightness` 拖动后会实际调整 LCD 背光，范围 `20..255`。
+- S3 断开但未解锁、未设置、未接管时进入 `STBY` 显示，避免待机状态持续断线蜂鸣。
+- 更新 `docs/s3-ui-final-components.md`，列出最终需要在 SquareLine 中放置的页面和组件名。
+
+### 验证
+
+- `pio test -e native`：通过，50/50 PASS。
+- `pio run -e s3_transmitter`：通过。
+- `pio run -e transmitter`：通过。
+- `pio run -e receiver`：通过。
+
+### 待硬件确认
+
+- `GPIO0`、`GPIO45`、`GPIO46` 属于启动/Strapping 相关敏感脚，固件已按当前原理图适配，但打板前仍建议复核上下拉和上电默认电平。
+- 档位 ADC 阈值当前按三等分 `0..4095` 处理；实物电阻误差较大时需要根据串口或 `ui_LabelSpeedAdc` 读数微调阈值。
+
 ### 未执行
 
 - 30 分钟稳定性测试未执行；按规则只在显式 `--long` 时运行。

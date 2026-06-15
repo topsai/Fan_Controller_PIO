@@ -366,6 +366,22 @@ void test_s3_status_text_appends_lock_without_hiding_link_status() {
   TEST_ASSERT_EQUAL_STRING("OK", buffer);
 }
 
+void test_s3_main_status_text_prioritizes_actionable_states() {
+  char buffer[24] = {};
+
+  s3FormatMainStatusText(buffer, sizeof(buffer), false, true, false, false, 0);
+  TEST_ASSERT_EQUAL_STRING("STBY", buffer);
+
+  s3FormatMainStatusText(buffer, sizeof(buffer), true, false, true, true, 0);
+  TEST_ASSERT_EQUAL_STRING("TAKEOVER", buffer);
+
+  s3FormatMainStatusText(buffer, sizeof(buffer), true, false, false, true, STATUS_FLAG_FAILSAFE);
+  TEST_ASSERT_EQUAL_STRING("RX FS", buffer);
+
+  s3FormatMainStatusText(buffer, sizeof(buffer), true, false, false, false, 0);
+  TEST_ASSERT_EQUAL_STRING("OK LOCK", buffer);
+}
+
 void test_s3_voltage_arc_value_clamps_to_vesc_display_range() {
   TEST_ASSERT_EQUAL_INT16(6, s3StatusVoltageForArc(false, 4800));
   TEST_ASSERT_EQUAL_INT16(6, s3StatusVoltageForArc(true, 0));
@@ -410,6 +426,41 @@ void test_s3_diagnostic_text_formats_link_quality() {
   TEST_ASSERT_EQUAL_STRING("RSSI -62 PKT 48 LOSS 3", buffer);
 }
 
+void test_s3_ui_detail_text_helpers_format_product_pages() {
+  char buffer[48] = {};
+
+  s3FormatProtocolText(buffer, sizeof(buffer));
+  TEST_ASSERT_EQUAL_STRING("CTRL v2 STAT v2", buffer);
+
+  s3FormatSequenceText(buffer, sizeof(buffer), 12, 34);
+  TEST_ASSERT_EQUAL_STRING("TX 12 RX 34", buffer);
+
+  s3FormatVescText(buffer, sizeof(buffer), STATUS_FLAG_VESC_VALID);
+  TEST_ASSERT_EQUAL_STRING("VESC OK", buffer);
+
+  s3FormatSensorsText(buffer, sizeof(buffer), true, false, true);
+  TEST_ASSERT_EQUAL_STRING("CW OK BMP N/A QMC OK", buffer);
+
+  s3FormatJoystickText(buffer, sizeof(buffer), "RAW", 2048);
+  TEST_ASSERT_EQUAL_STRING("RAW 2048", buffer);
+
+  s3FormatFirmwareText(buffer, sizeof(buffer), "s3-remote", "Jun 15 2026");
+  TEST_ASSERT_EQUAL_STRING("FW s3-remote Jun 15 2026", buffer);
+
+  s3FormatBrightnessText(buffer, sizeof(buffer), 140);
+  TEST_ASSERT_EQUAL_STRING("BRI 140", buffer);
+
+  TEST_ASSERT_EQUAL_UINT8(20, s3ClampUserBrightness(0));
+  TEST_ASSERT_EQUAL_UINT8(140, s3ClampUserBrightness(140));
+  TEST_ASSERT_EQUAL_UINT8(255, s3ClampUserBrightness(300));
+
+  s3FormatPowerModeText(buffer, sizeof(buffer), false, true);
+  TEST_ASSERT_EQUAL_STRING("DIM", buffer);
+
+  s3FormatUpgradeText(buffer, sizeof(buffer));
+  TEST_ASSERT_EQUAL_STRING("USB: pio upload", buffer);
+}
+
 void test_s3_receiver_status_text_decodes_flags() {
   char buffer[48] = {};
   s3FormatReceiverStatusFlags(buffer, sizeof(buffer), STATUS_FLAG_FAILSAFE | STATUS_FLAG_PROTOCOL_FAULT);
@@ -445,6 +496,15 @@ void test_s3_bmp280_reading_rejects_transient_zero_or_nan_values() {
   TEST_ASSERT_FALSE(s3Bmp280ReadingIsPlausible(0.0f, 0.0f));
   TEST_ASSERT_FALSE(s3Bmp280ReadingIsPlausible(NAN, 100.0f));
   TEST_ASSERT_FALSE(s3Bmp280ReadingIsPlausible(1000.0f, NAN));
+}
+
+void test_s3_speed_level_from_adc_matches_ladder_ranges() {
+  TEST_ASSERT_EQUAL_UINT8(1, s3SpeedLevelFromAdc(0));
+  TEST_ASSERT_EQUAL_UINT8(1, s3SpeedLevelFromAdc(1364));
+  TEST_ASSERT_EQUAL_UINT8(2, s3SpeedLevelFromAdc(1365));
+  TEST_ASSERT_EQUAL_UINT8(2, s3SpeedLevelFromAdc(2729));
+  TEST_ASSERT_EQUAL_UINT8(3, s3SpeedLevelFromAdc(2730));
+  TEST_ASSERT_EQUAL_UINT8(3, s3SpeedLevelFromAdc(4095));
 }
 
 void setup() {
@@ -486,16 +546,19 @@ void setup() {
   RUN_TEST(test_s3_battery_arc_value_clamps_and_rounds_soc);
   RUN_TEST(test_s3_speed_label_color_uses_speed_bands);
   RUN_TEST(test_s3_status_text_appends_lock_without_hiding_link_status);
+  RUN_TEST(test_s3_main_status_text_prioritizes_actionable_states);
   RUN_TEST(test_s3_voltage_arc_value_clamps_to_vesc_display_range);
   RUN_TEST(test_s3_throttle_bar_keeps_center_and_uses_direction_colors);
   RUN_TEST(test_s3_compass_angle_uses_qmc_heading_in_lvgl_tenths);
   RUN_TEST(test_s3_mcu_temperature_formats_one_decimal_or_placeholder);
   RUN_TEST(test_s3_diagnostic_text_formats_link_quality);
+  RUN_TEST(test_s3_ui_detail_text_helpers_format_product_pages);
   RUN_TEST(test_s3_receiver_status_text_decodes_flags);
   RUN_TEST(test_s3_mcu_temperature_warning_threshold);
   RUN_TEST(test_s3_bmp280_altitude_uses_standard_sea_level_pressure);
   RUN_TEST(test_s3_cw2015_reading_rejects_transient_zero_or_nan_values);
   RUN_TEST(test_s3_bmp280_reading_rejects_transient_zero_or_nan_values);
+  RUN_TEST(test_s3_speed_level_from_adc_matches_ladder_ranges);
   UNITY_END();
 }
 

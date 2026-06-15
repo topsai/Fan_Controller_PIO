@@ -4,6 +4,29 @@
 #include "s3_ui_bindings.h"
 #include <lvgl.h>
 
+extern "C" {
+extern lv_obj_t *ui_LabelLinkDiag __attribute__((weak));
+extern lv_obj_t *ui_LabelRxFlags __attribute__((weak));
+extern lv_obj_t *ui_LabelProtocol __attribute__((weak));
+extern lv_obj_t *ui_LabelSeq __attribute__((weak));
+extern lv_obj_t *ui_LabelVesc __attribute__((weak));
+extern lv_obj_t *ui_LabelSensors __attribute__((weak));
+extern lv_obj_t *ui_LabelJoyCenter __attribute__((weak));
+extern lv_obj_t *ui_LabelJoyRaw __attribute__((weak));
+extern lv_obj_t *ui_LabelJoyOut __attribute__((weak));
+extern lv_obj_t *ui_LabelJoyRange __attribute__((weak));
+extern lv_obj_t *ui_LabelSpeedAdc __attribute__((weak));
+extern lv_obj_t *ui_ButtonJoyCal __attribute__((weak));
+extern lv_obj_t *ui_ButtonJoyMinus __attribute__((weak));
+extern lv_obj_t *ui_ButtonJoyPlus __attribute__((weak));
+extern lv_obj_t *ui_ButtonJoyReset __attribute__((weak));
+extern lv_obj_t *ui_LabelFirmware __attribute__((weak));
+extern lv_obj_t *ui_LabelBrightness __attribute__((weak));
+extern lv_obj_t *ui_LabelPowerMode __attribute__((weak));
+extern lv_obj_t *ui_LabelUpgrade __attribute__((weak));
+extern lv_obj_t *ui_SliderBrightness __attribute__((weak));
+}
+
 namespace {
 
 lv_obj_t *settingsPanel = nullptr;
@@ -16,6 +39,12 @@ lv_obj_t *settingsCalButton = nullptr;
 lv_obj_t *settingsCloseButton = nullptr;
 bool settingsVisible = false;
 bool touchWasPressed = false;
+bool brightnessRequestPending = false;
+uint8_t brightnessRequest = 0;
+
+lv_obj_t *optionalUiObject(lv_obj_t **symbol) {
+  return symbol == nullptr ? nullptr : *symbol;
+}
 
 lv_obj_t *batteryArc() {
   return ui_ArcBattery;
@@ -59,6 +88,95 @@ lv_obj_t *compassImage() {
 
 lv_obj_t *mcuTemperatureLabel() {
   return ui_MCUTemp;
+}
+
+lv_obj_t *linkDiagnosticLabel() {
+  return optionalUiObject(&ui_LabelLinkDiag);
+}
+
+lv_obj_t *receiverFlagsLabel() {
+  return optionalUiObject(&ui_LabelRxFlags);
+}
+
+lv_obj_t *protocolLabel() {
+  return optionalUiObject(&ui_LabelProtocol);
+}
+
+lv_obj_t *sequenceLabel() {
+  return optionalUiObject(&ui_LabelSeq);
+}
+
+lv_obj_t *vescLabel() {
+  return optionalUiObject(&ui_LabelVesc);
+}
+
+lv_obj_t *sensorsLabel() {
+  return optionalUiObject(&ui_LabelSensors);
+}
+
+lv_obj_t *joyCenterLabel() {
+  return optionalUiObject(&ui_LabelJoyCenter);
+}
+
+lv_obj_t *joyRawLabel() {
+  return optionalUiObject(&ui_LabelJoyRaw);
+}
+
+lv_obj_t *joyOutLabel() {
+  return optionalUiObject(&ui_LabelJoyOut);
+}
+
+lv_obj_t *joyRangeLabel() {
+  return optionalUiObject(&ui_LabelJoyRange);
+}
+
+lv_obj_t *speedAdcLabel() {
+  return optionalUiObject(&ui_LabelSpeedAdc);
+}
+
+lv_obj_t *joyCalButton() {
+  return optionalUiObject(&ui_ButtonJoyCal);
+}
+
+lv_obj_t *joyMinusButton() {
+  return optionalUiObject(&ui_ButtonJoyMinus);
+}
+
+lv_obj_t *joyPlusButton() {
+  return optionalUiObject(&ui_ButtonJoyPlus);
+}
+
+lv_obj_t *joyResetButton() {
+  return optionalUiObject(&ui_ButtonJoyReset);
+}
+
+lv_obj_t *firmwareLabel() {
+  return optionalUiObject(&ui_LabelFirmware);
+}
+
+lv_obj_t *brightnessLabel() {
+  return optionalUiObject(&ui_LabelBrightness);
+}
+
+lv_obj_t *powerModeLabel() {
+  return optionalUiObject(&ui_LabelPowerMode);
+}
+
+lv_obj_t *upgradeLabel() {
+  return optionalUiObject(&ui_LabelUpgrade);
+}
+
+lv_obj_t *brightnessSlider() {
+  return optionalUiObject(&ui_SliderBrightness);
+}
+
+void brightnessSliderEvent(lv_event_t *event) {
+  lv_obj_t *target = lv_event_get_target(event);
+  if (target == nullptr) {
+    return;
+  }
+  brightnessRequest = s3ClampUserBrightness(lv_slider_get_value(target));
+  brightnessRequestPending = true;
 }
 
 lv_obj_t *createSettingsButton(lv_obj_t *parent, const char *text, int16_t x, int16_t y, int16_t w, int16_t h) {
@@ -193,6 +311,61 @@ void s3_ui_init() {
     lv_obj_set_style_text_font(mcuTemperatureLabel(), &lv_font_montserrat_12, LV_PART_MAIN);
   }
 
+  if (linkDiagnosticLabel() != nullptr) {
+    lv_label_set_text(linkDiagnosticLabel(), "RSSI -- PKT 0 LOSS 0");
+  }
+  if (receiverFlagsLabel() != nullptr) {
+    lv_label_set_text(receiverFlagsLabel(), "OK");
+  }
+  if (protocolLabel() != nullptr) {
+    char buffer[32] = {};
+    s3FormatProtocolText(buffer, sizeof(buffer));
+    lv_label_set_text(protocolLabel(), buffer);
+  }
+  if (sequenceLabel() != nullptr) {
+    lv_label_set_text(sequenceLabel(), "TX 0 RX 0");
+  }
+  if (vescLabel() != nullptr) {
+    lv_label_set_text(vescLabel(), "VESC N/A");
+  }
+  if (sensorsLabel() != nullptr) {
+    lv_label_set_text(sensorsLabel(), "CW N/A BMP N/A QMC N/A");
+  }
+  if (joyCenterLabel() != nullptr) {
+    lv_label_set_text(joyCenterLabel(), "CENTER 2048");
+  }
+  if (joyRawLabel() != nullptr) {
+    lv_label_set_text(joyRawLabel(), "RAW 2048");
+  }
+  if (joyOutLabel() != nullptr) {
+    lv_label_set_text(joyOutLabel(), "OUT 0");
+  }
+  if (joyRangeLabel() != nullptr) {
+    lv_label_set_text(joyRangeLabel(), "MIN 0 MAX 4095 DZ 50");
+  }
+  if (speedAdcLabel() != nullptr) {
+    lv_label_set_text(speedAdcLabel(), "SPD ADC 0");
+  }
+  if (firmwareLabel() != nullptr) {
+    lv_label_set_text(firmwareLabel(), "FW");
+  }
+  if (brightnessLabel() != nullptr) {
+    lv_label_set_text(brightnessLabel(), "BRI 0");
+  }
+  if (powerModeLabel() != nullptr) {
+    lv_label_set_text(powerModeLabel(), "ACTIVE");
+  }
+  if (upgradeLabel() != nullptr) {
+    char buffer[32] = {};
+    s3FormatUpgradeText(buffer, sizeof(buffer));
+    lv_label_set_text(upgradeLabel(), buffer);
+  }
+  if (brightnessSlider() != nullptr) {
+    lv_slider_set_range(brightnessSlider(), 20, 255);
+    lv_slider_set_value(brightnessSlider(), 140, LV_ANIM_OFF);
+    lv_obj_add_event_cb(brightnessSlider(), brightnessSliderEvent, LV_EVENT_VALUE_CHANGED, nullptr);
+  }
+
   createSettingsPanel();
 }
 
@@ -203,17 +376,20 @@ void s3_ui_update(const S3UiState &state) {
   const int16_t statusVoltageValue = s3StatusVoltageForArc(state.connected, state.receiverVoltageX100);
   const int16_t compassAngle = s3CompassAngleForHeading(state.qmcValid, state.qmcHeadingDeg);
 
-  if (state.connected && (state.receiverStatusFlags & STATUS_FLAG_FAILSAFE) != 0) {
-    snprintf(buffer, sizeof(buffer), "RX FS");
-  } else if (state.connected && (state.receiverStatusFlags & STATUS_FLAG_PROTOCOL_FAULT) != 0) {
-    snprintf(buffer, sizeof(buffer), "PROTO");
-  } else {
-    s3FormatStatusText(buffer, sizeof(buffer), state.connected, state.armed);
-  }
+  s3FormatMainStatusText(buffer,
+                         sizeof(buffer),
+                         state.connected,
+                         state.standbyMode,
+                         state.takeoverActive,
+                         state.armed,
+                         state.receiverStatusFlags);
   if (statusValueLabel() != nullptr) {
     lv_label_set_text(statusValueLabel(), buffer);
     const bool receiverFault = (state.receiverStatusFlags & (STATUS_FLAG_FAILSAFE | STATUS_FLAG_PROTOCOL_FAULT)) != 0;
-    const uint32_t color = receiverFault ? 0xFF4040 : (!state.armed ? 0xFFD23F : (state.connected ? 0x00D86A : 0xFF4040));
+    const uint32_t color = receiverFault ? 0xFF4040 :
+                           (state.takeoverActive ? 0x00D8FF :
+                            (state.standbyMode ? 0x8AA0B2 :
+                             (!state.armed ? 0xFFD23F : (state.connected ? 0x00D86A : 0xFF4040))));
     lv_obj_set_style_text_color(statusValueLabel(), lv_color_hex(color), LV_PART_MAIN);
   }
 
@@ -282,6 +458,75 @@ void s3_ui_update(const S3UiState &state) {
                                 LV_PART_MAIN);
   }
 
+  if (linkDiagnosticLabel() != nullptr) {
+    s3FormatLinkDiagnosticText(buffer, sizeof(buffer), state.rssiValue, state.statusPacketRateHz, state.statusLostPackets);
+    lv_label_set_text(linkDiagnosticLabel(), buffer);
+  }
+  if (receiverFlagsLabel() != nullptr) {
+    s3FormatReceiverStatusFlags(buffer, sizeof(buffer), state.receiverStatusFlags);
+    lv_label_set_text(receiverFlagsLabel(), buffer);
+  }
+  if (protocolLabel() != nullptr) {
+    s3FormatProtocolText(buffer, sizeof(buffer));
+    lv_label_set_text(protocolLabel(), buffer);
+  }
+  if (sequenceLabel() != nullptr) {
+    s3FormatSequenceText(buffer, sizeof(buffer), state.controlSequence, state.lastStatusSequence);
+    lv_label_set_text(sequenceLabel(), buffer);
+  }
+  if (vescLabel() != nullptr) {
+    s3FormatVescText(buffer, sizeof(buffer), state.receiverStatusFlags);
+    lv_label_set_text(vescLabel(), buffer);
+  }
+  if (sensorsLabel() != nullptr) {
+    s3FormatSensorsText(buffer, sizeof(buffer), state.cw2015Valid, state.bmp280Valid, state.qmcValid);
+    lv_label_set_text(sensorsLabel(), buffer);
+  }
+  if (joyCenterLabel() != nullptr) {
+    s3FormatJoystickText(buffer, sizeof(buffer), "CENTER", state.joystickCenter);
+    lv_label_set_text(joyCenterLabel(), buffer);
+  }
+  if (joyRawLabel() != nullptr) {
+    s3FormatJoystickText(buffer, sizeof(buffer), "RAW", state.joystickRawAdc);
+    lv_label_set_text(joyRawLabel(), buffer);
+  }
+  if (joyOutLabel() != nullptr) {
+    s3FormatJoystickText(buffer, sizeof(buffer), "OUT", state.joystickValue);
+    lv_label_set_text(joyOutLabel(), buffer);
+  }
+  if (joyRangeLabel() != nullptr) {
+    snprintf(buffer,
+             sizeof(buffer),
+             "MIN %d MAX %d DZ %d",
+             state.joystickMinRaw,
+             state.joystickMaxRaw,
+             state.joystickDeadzone);
+    lv_label_set_text(joyRangeLabel(), buffer);
+  }
+  if (speedAdcLabel() != nullptr) {
+    snprintf(buffer, sizeof(buffer), "SPD ADC %u", state.speedAdcRaw);
+    lv_label_set_text(speedAdcLabel(), buffer);
+  }
+  if (firmwareLabel() != nullptr) {
+    s3FormatFirmwareText(buffer, sizeof(buffer), state.firmwareVersion, state.buildDate);
+    lv_label_set_text(firmwareLabel(), buffer);
+  }
+  if (brightnessLabel() != nullptr) {
+    s3FormatBrightnessText(buffer, sizeof(buffer), state.displayBrightness);
+    lv_label_set_text(brightnessLabel(), buffer);
+  }
+  if (powerModeLabel() != nullptr) {
+    s3FormatPowerModeText(buffer, sizeof(buffer), state.standbyMode, state.displayDimmed);
+    lv_label_set_text(powerModeLabel(), buffer);
+  }
+  if (upgradeLabel() != nullptr) {
+    s3FormatUpgradeText(buffer, sizeof(buffer));
+    lv_label_set_text(upgradeLabel(), buffer);
+  }
+  if (brightnessSlider() != nullptr && !lv_obj_has_state(brightnessSlider(), LV_STATE_PRESSED)) {
+    lv_slider_set_value(brightnessSlider(), state.displayBrightness, LV_ANIM_OFF);
+  }
+
   s3_ui_set_settings_visible(state.settingsMode);
   if (settingsCenterLabel != nullptr) {
     snprintf(buffer, sizeof(buffer), "CENTER %d", state.joystickCenter);
@@ -305,15 +550,40 @@ void s3_ui_set_settings_visible(bool visible) {
   }
 }
 
+bool s3_ui_consume_brightness_request(uint8_t &brightness) {
+  if (!brightnessRequestPending) {
+    return false;
+  }
+  brightness = brightnessRequest;
+  brightnessRequestPending = false;
+  return true;
+}
+
 S3UiTouchAction s3_ui_set_touch(bool pressed, int16_t x, int16_t y) {
   if (!pressed) {
     touchWasPressed = false;
     return S3UiTouchAction::None;
   }
-  if (touchWasPressed || !settingsVisible) {
+  if (touchWasPressed) {
     return S3UiTouchAction::None;
   }
   touchWasPressed = true;
+
+  if (touchInside(joyCalButton(), x, y)) {
+    return S3UiTouchAction::CalibrateCenter;
+  }
+  if (touchInside(joyMinusButton(), x, y)) {
+    return S3UiTouchAction::CenterMinus;
+  }
+  if (touchInside(joyPlusButton(), x, y)) {
+    return S3UiTouchAction::CenterPlus;
+  }
+  if (touchInside(joyResetButton(), x, y)) {
+    return S3UiTouchAction::ResetCalibration;
+  }
+  if (!settingsVisible) {
+    return S3UiTouchAction::None;
+  }
 
   if (touchInside(settingsCalButton, x, y)) {
     return S3UiTouchAction::CalibrateCenter;

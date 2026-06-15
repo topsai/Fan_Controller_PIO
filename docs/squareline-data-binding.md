@@ -33,11 +33,13 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 | QMC5883L 航向 | Image | `ui_Compass` | `qmcValid/qmcHeadingDeg` | `lv_img_set_angle()` |
 | ESP32-S3 MCU 温度 | Label | `ui_MCUTemp` | `mcuTemperatureC` | `lv_label_set_text()` |
 
+诊断页、校准页、系统页的最终对象名见 `docs/s3-ui-final-components.md`。这些对象在固件中按弱符号可选绑定：SquareLine 尚未创建时会自动跳过，创建并导出后会自动显示数据或响应按钮。
+
 当前 SquareLine 导出的电池 Arc 实例名是 `ui_ArcBattery`，电量文字是 `ui_LabelBattery`，代码已按这两个实际名称绑定。最终以 `src/transmitter_s3/ui/generated/ui_Screen1.h` 中的 `extern lv_obj_t * ...` 声明为准。
 
 当前 SquareLine 导出的速度 Label 实例名是 `ui_LabelSpeed`。速度颜色规则在 `include/s3_ui_bindings.h` 的 `s3SpeedColorHex()` 中维护：低于 15 km/h 为绿色，15-29 km/h 为黄色，30 km/h 及以上为红色。
 
-当前 SquareLine 导出的状态 Label 实例名是 `ui_LabelStatus`。连接时显示 `OK` 并使用绿色；断联时显示 `LOST` 并使用红色。发射端未解锁时不会覆盖连接状态，而是在状态后追加 `LOCK`，例如 `OK LOCK` 或 `LOST LOCK`。VESC 电压由独立的 `ui_LabelStatusVoltage` 显示。
+当前 SquareLine 导出的状态 Label 实例名是 `ui_LabelStatus`。连接正常显示 `OK`；待机显示 `STBY`；接管请求窗口显示 `TAKEOVER`；接收端 failsafe 显示 `RX FS`；协议错误显示 `PROTO`；发射端未解锁时追加 `LOCK`，例如 `OK LOCK`。VESC 电压由独立的 `ui_LabelStatusVoltage` 显示。
 
 当前 SquareLine 导出的档位 Label 实例名是 `ui_LabelControl`，显示格式为单独档位数字，例如 `1`、`2`、`3`。
 
@@ -53,7 +55,7 @@ SquareLine 不能直接获取 CW2015、VESC、摇杆、按钮等真实硬件数�
 
 旧版手写叠加参数层已经删除，包括标题、连接状态、档位/油门、速度、电池、BMP280、航向、按钮/RSSI、FPS、触摸坐标和占位 GPIO 提示。后续新增显示内容应优先在 SquareLine 创建控件，再在 `src/transmitter_s3/ui/ui.cpp` 里绑定数据；没有实际控件的占位项不再写入当前绑定表。
 
-当前 S3 摇杆设置页是 `src/transmitter_s3/ui/ui.cpp` 创建的临时 LVGL 覆盖层，用于按钮 1 进入设置、触摸校准和中位微调。它不写入 `src/transmitter_s3/ui/generated/`，不会被 SquareLine 导出覆盖。后续如果要统一视觉风格，可以在 SquareLine 中创建正式设置页面，再把触摸动作绑定迁移过去。
+当前 S3 摇杆设置页仍保留 `src/transmitter_s3/ui/ui.cpp` 创建的临时 LVGL 覆盖层，用于按钮 1 进入设置、触摸校准和中位微调。你也可以在 SquareLine 中创建正式校准页并放置 `ui_ButtonJoyCal`、`ui_ButtonJoyMinus`、`ui_ButtonJoyPlus`、`ui_ButtonJoyReset`，固件会优先响应这些正式按钮。
 
 ## 电池 Arc 设置
 

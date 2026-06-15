@@ -17,23 +17,22 @@
 
 namespace {
 
-constexpr int LCD_POWER_PIN = 41;
+constexpr const char *S3_FIRMWARE_VERSION = "s3-remote-ui";
+
+constexpr int LCD_POWER_PIN = 47;
 constexpr int LCD_POWER_ACTIVE_LEVEL = LOW;
-constexpr int LCD_TE_PIN = 47;
+constexpr int LCD_TE_PIN = 37;
 constexpr int LCD_RST_PIN = 8;
 
-constexpr int AUX_I2C_SDA_PIN = 18;
-constexpr int AUX_I2C_SCL_PIN = 19;
+constexpr int AUX_I2C_SDA_PIN = 39;
+constexpr int AUX_I2C_SCL_PIN = 38;
 constexpr uint32_t AUX_I2C_FREQ_HZ = 300000;
 
-// Temporary software placeholders. Replace after the S3 PCB pinout is finalized.
 constexpr int JOYSTICK_PIN = 1;
-constexpr int SWITCH_PIN_1 = 37;
-constexpr int SWITCH_PIN_2 = 38;
-constexpr int SWITCH_PIN_3 = 39;
-constexpr int BUTTON_1_PIN = 35;
-constexpr int BUTTON_2_PIN = 36;
-constexpr int BUZZER_PIN = 42;
+constexpr int SPEED_LEVEL_ADC_PIN = 2;
+constexpr int BUTTON_1_PIN = 0;
+constexpr int BUTTON_2_PIN = 46;
+constexpr int BUZZER_PIN = 40;
 
 constexpr uint8_t RECEIVER_MAC[] = {0xAC, 0xEB, 0xE6, 0x44, 0xC5, 0x90};
 constexpr uint8_t CW2015_ADDR = 0x62;
@@ -252,6 +251,8 @@ uint8_t receiverMac[] = {0xAC, 0xEB, 0xE6, 0x44, 0xC5, 0x90};
 
 int joystickCenter = ADC_CENTER;
 JoystickCalibration joystickCalibration = {ADC_CENTER, 0, 4095, JOYSTICK_DEADZONE};
+int joystickAdcRaw = ADC_CENTER;
+uint16_t speedAdcRaw = 0;
 int16_t joystickRawValue = 0;
 int16_t joystickValue = 0;
 uint8_t speedLevel = 1;
@@ -284,8 +285,10 @@ uint32_t lastDisplayMs = 0;
 uint32_t lastLocalSensorMs = 0;
 uint32_t lastDebugMs = 0;
 uint32_t lastLinkAlertMs = 0;
+bool everReceivedStatusPacket = false;
 uint32_t lastLvglHandlerMs = 0;
 uint32_t lastUserActivityMs = 0;
+uint8_t userBrightness = LCD_BRIGHTNESS;
 uint8_t currentBrightness = LCD_BRIGHTNESS;
 TaskHandle_t controlTaskHandle = nullptr;
 
@@ -340,11 +343,15 @@ void beep(uint16_t frequencyHz, uint16_t durationMs) {
   tone(BUZZER_PIN, frequencyHz, durationMs);
 }
 
+void setDisplayBrightness(uint8_t brightness) {
+  currentBrightness = s3ClampUserBrightness(brightness);
+  display.setBrightness(currentBrightness);
+}
+
 void markUserActivity() {
   lastUserActivityMs = millis();
-  if (currentBrightness != LCD_BRIGHTNESS) {
-    currentBrightness = LCD_BRIGHTNESS;
-    display.setBrightness(currentBrightness);
+  if (currentBrightness != userBrightness) {
+    setDisplayBrightness(userBrightness);
   }
 }
 
@@ -352,9 +359,9 @@ void updateDisplayPower() {
   if (settingsMode || millis() - lastUserActivityMs < DISPLAY_DIM_AFTER_MS) {
     return;
   }
-  if (currentBrightness != LCD_DIM_BRIGHTNESS) {
-    currentBrightness = LCD_DIM_BRIGHTNESS;
-    display.setBrightness(currentBrightness);
+  const uint8_t targetBrightness = userBrightness < LCD_DIM_BRIGHTNESS ? userBrightness : LCD_DIM_BRIGHTNESS;
+  if (currentBrightness != targetBrightness) {
+    setDisplayBrightness(targetBrightness);
   }
 }
 
@@ -581,9 +588,7 @@ void readLocalSensors() {
 }
 
 void setupPins() {
-  pinMode(SWITCH_PIN_1, INPUT_PULLUP);
-  pinMode(SWITCH_PIN_2, INPUT_PULLUP);
-  pinMode(SWITCH_PIN_3, INPUT_PULLUP);
+  pinMode(SPEED_LEVEL_ADC_PIN, INPUT);
   pinMode(BUTTON_1_PIN, INPUT_PULLUP);
   pinMode(BUTTON_2_PIN, INPUT_PULLUP);
   pinMode(BUZZER_PIN, OUTPUT);
@@ -609,7 +614,8 @@ void calibrateJoystickCenter() {
 }
 
 void readInputs() {
-  const int16_t targetThrottle = joystickToThrottleCalibrated(analogRead(JOYSTICK_PIN), joystickCalibration);
+  joystickAdcRaw = analogRead(JOYSTICK_PIN);
+  const int16_t targetThrottle = joystickToThrottleCalibrated(joystickAdcRaw, joystickCalibration);
   if (abs(targetThrottle) > JOYSTICK_DEADZONE) {
     markUserActivity();
   }
@@ -624,16 +630,8 @@ void readInputs() {
   const int16_t safeTarget = settingsMode ? 0 : safeThrottleForArming(targetThrottle, transmitterArmed);
   joystickValue = slewLimitedThrottle(joystickValue, safeTarget, THROTTLE_SLEW_STEP);
 
-  const bool sw1 = !digitalRead(SWITCH_PIN_1);
-  const bool sw2 = !digitalRead(SWITCH_PIN_2);
-  const bool sw3 = !digitalRead(SWITCH_PIN_3);
-  if (sw3) {
-    speedLevel = 3;
-  } else if (sw2) {
-    speedLevel = 2;
-  } else {
-    speedLevel = 1;
-  }
+  speedAdcRaw = (uint16_t)analogRead(SPEED_LEVEL_ADC_PIN);
+  speedLevel = s3SpeedLevelFromAdc(speedAdcRaw);
 
   uint8_t nextButtons = 0;
   const bool button1Down = !digitalRead(BUTTON_1_PIN);
@@ -673,8 +671,7 @@ void setupDisplay() {
   pinMode(LCD_TE_PIN, INPUT);
   display.init();
   display.setRotation(0);
-  display.setBrightness(LCD_BRIGHTNESS);
-  currentBrightness = LCD_BRIGHTNESS;
+  setDisplayBrightness(userBrightness);
   lastUserActivityMs = millis();
 }
 
@@ -715,6 +712,16 @@ void lvTouchReadCallback(lv_indev_drv_t *, lv_indev_data_t *data) {
         joystickCenterAdjust += JOYSTICK_CENTER_ADJUST_STEP;
         markUserActivity();
         beep(BEEP_FREQ_BUTTON, 30);
+        break;
+      case S3UiTouchAction::ResetCalibration:
+        joystickCalibration = {ADC_CENTER, 0, 4095, JOYSTICK_DEADZONE};
+        joystickCenter = ADC_CENTER;
+        saveJoystickCalibration();
+        markUserActivity();
+        transmitterArmed = false;
+        armBrakeHolding = false;
+        joystickValue = 0;
+        beep(BEEP_FREQ_BUTTON, 50);
         break;
       case S3UiTouchAction::CloseSettings:
         settingsMode = false;
@@ -809,6 +816,7 @@ void setupEspNow() {
     receiverStatusFlags = pkt->status;
     lastRecvTime = millis();
     connected = true;
+    everReceivedStatusPacket = true;
   });
 
   Serial.print("S3 transmitter MAC: ");
@@ -863,7 +871,8 @@ void updateConnectionState() {
     resetSequenceAfterConnectionTimeout(connected, hasStatusSequence, lastStatusSequence);
     statusLostPackets = 0;
   }
-  if (!connected && millis() - lastLinkAlertMs > 1000) {
+  const bool standbyMode = !connected && !transmitterArmed && !settingsMode && millis() >= takeoverRequestUntilMs;
+  if (!connected && !standbyMode && everReceivedStatusPacket && millis() - lastLinkAlertMs > 1000) {
     lastLinkAlertMs = millis();
     beep(BEEP_FREQ_LINK_ALERT, 80);
   }
@@ -917,10 +926,22 @@ void updateDashboard() {
   state.receiverStatusFlags = receiverStatusFlags;
   state.statusPacketRateHz = statusPacketRateHz;
   state.statusLostPackets = statusLostPackets;
+  state.controlSequence = controlSequence;
+  state.lastStatusSequence = lastStatusSequence;
   state.displayBrightness = currentBrightness;
+  state.displayDimmed = currentBrightness == LCD_DIM_BRIGHTNESS;
+  state.takeoverActive = millis() < takeoverRequestUntilMs;
+  state.standbyMode = !connected && !transmitterArmed && !settingsMode && !state.takeoverActive;
   state.armed = transmitterArmed;
   state.settingsMode = settingsMode;
   state.joystickCenter = joystickCenter;
+  state.joystickRawAdc = joystickAdcRaw;
+  state.joystickMinRaw = joystickCalibration.minRaw;
+  state.joystickMaxRaw = joystickCalibration.maxRaw;
+  state.joystickDeadzone = joystickCalibration.deadzone;
+  state.speedAdcRaw = speedAdcRaw;
+  state.firmwareVersion = S3_FIRMWARE_VERSION;
+  state.buildDate = __DATE__;
   s3_ui_update(state);
 }
 
@@ -961,6 +982,7 @@ void handleDiagnosticCommand(const String &line) {
     receiverStatusFlags = (uint8_t)clampInt(status, 0, 255);
     lastRecvTime = millis();
     connected = true;
+    everReceivedStatusPacket = true;
     statusPacketCounter++;
     diagnosticStatusPackets++;
     Serial.println("DIAG OK simstatus");
@@ -1066,15 +1088,23 @@ void loop() {
     lv_timer_handler();
   }
 
+  uint8_t requestedBrightness = 0;
+  if (s3_ui_consume_brightness_request(requestedBrightness)) {
+    userBrightness = s3ClampUserBrightness(requestedBrightness);
+    setDisplayBrightness(userBrightness);
+    markUserActivity();
+  }
+
   updateDisplayPower();
 
   if (now - lastDebugMs >= 1000) {
     lastDebugMs = now;
+    const bool standbyMode = !connected && !transmitterArmed && !settingsMode && millis() >= takeoverRequestUntilMs;
     Serial.printf("S3 THR:%d SPD:%u BTN:%02X %s BAT:%s\n",
                   joystickValue,
                   speedLevel,
                   buttonState,
-                  connected ? "[OK]" : "[LOST]",
+                  connected ? "[OK]" : (standbyMode ? "[STBY]" : "[LOST]"),
                   cw2015.valid ? "OK" : "N/A");
   }
 
