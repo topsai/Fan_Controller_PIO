@@ -289,6 +289,16 @@ void test_protocol_sequence_accepts_fresh_values_and_rejects_stale_replays() {
   TEST_ASSERT_TRUE(protocolSequenceIsFresh(0, 65535, true));
 }
 
+void test_status_sequence_resets_after_connection_timeout() {
+  uint16_t lastSeq = 4200;
+  bool hasSeq = true;
+
+  resetSequenceAfterConnectionTimeout(false, hasSeq, lastSeq);
+
+  TEST_ASSERT_FALSE(hasSeq);
+  TEST_ASSERT_TRUE(protocolSequenceIsFresh(0, lastSeq, hasSeq));
+}
+
 void test_protocol_status_flags_are_composable() {
   uint8_t flags = 0;
   flags |= STATUS_FLAG_FAILSAFE;
@@ -467,6 +477,7 @@ void setup() {
   RUN_TEST(test_button_short_press_and_long_press_are_distinct);
   RUN_TEST(test_protocol_crc8_detects_packet_changes);
   RUN_TEST(test_protocol_sequence_accepts_fresh_values_and_rejects_stale_replays);
+  RUN_TEST(test_status_sequence_resets_after_connection_timeout);
   RUN_TEST(test_protocol_status_flags_are_composable);
   RUN_TEST(test_protocol_control_takeover_flag_is_separate_from_status_lock_flag);
   RUN_TEST(test_protocol_legacy_checksum_keeps_v1_packets_migratable);

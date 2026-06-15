@@ -1233,3 +1233,31 @@ S3 页面上的本机电量和 BMP280 气压/海拔偶发变成 `0` 或无效显
 ### 未执行
 
 - 30 分钟稳定性测试未执行；按规则只在显式 `--long` 时运行。
+
+## 2026-06-15 状态包序号超时重置修复
+
+### 现象
+
+用户反馈接收器一直在断线报警。串口排查显示接收端 `connected=1 active=<c3|s3>`，但遥控器侧可能显示 `[LOST]`。
+
+### 根因
+
+接收端重启或重新烧录后，状态包序号从 0 重新开始；遥控器端没有在连接超时后清除旧的 `lastStatusSequence`，会持续拒收接收端的新状态包。
+
+### 已修改
+
+- `include/control_logic.h` 新增 `resetSequenceAfterConnectionTimeout()`。
+- C3 基础版遥控器在连接超时后重置状态包序号记忆。
+- S3 高级遥控器在连接超时后重置状态包序号记忆，并清零状态包丢包估计。
+- 新增回归单测 `test_status_sequence_resets_after_connection_timeout()`。
+
+### 验证
+
+- `pio test -e native`：通过，47/47 PASS。
+- `pio run -e transmitter`：通过。
+- `pio run -e s3_transmitter`：通过。
+- `pio run -e transmitter -t upload --upload-port COM5`：通过。
+- `pio run -e s3_transmitter -t upload --upload-port COM3`：通过。
+- `python tools/diagnostics/link_test.py --receiver-port COM4 --remote-port COM5`：通过，10 秒。
+- `python tools/diagnostics/link_test.py --receiver-port COM4 --remote-port COM3`：通过，10 秒。
+- `python tools/diagnostics/link_test.py --receiver-port COM4 --remote-a COM5 --remote-b COM3`：通过，短切换测试。

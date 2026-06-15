@@ -490,7 +490,10 @@ void checkConnection() {
   if (millis() - lastRecvTime > HEARTBEAT_TIMEOUT) {
     if (connected) {
       connected = false;
+      resetSequenceAfterConnectionTimeout(connected, hasStatusSequence, lastStatusSequence);
       Serial.println("⚠️ 接收机断线！");
+    } else {
+      resetSequenceAfterConnectionTimeout(connected, hasStatusSequence, lastStatusSequence);
     }
   }
 }

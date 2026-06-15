@@ -860,6 +860,8 @@ void startControlSendTask() {
 void updateConnectionState() {
   if (millis() - lastRecvTime > CONNECTION_TIMEOUT_MS) {
     connected = false;
+    resetSequenceAfterConnectionTimeout(connected, hasStatusSequence, lastStatusSequence);
+    statusLostPackets = 0;
   }
   if (!connected && millis() - lastLinkAlertMs > 1000) {
     lastLinkAlertMs = millis();

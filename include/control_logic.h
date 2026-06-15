@@ -210,6 +210,14 @@ inline void rememberStatusTarget(const uint8_t *sourceMac, uint8_t *targetMac, b
   hasTarget = true;
 }
 
+inline void resetSequenceAfterConnectionTimeout(bool connected, bool &hasSequence, uint16_t &lastSequence) {
+  if (connected) {
+    return;
+  }
+  hasSequence = false;
+  lastSequence = 0;
+}
+
 struct ControllerSourceState {
   bool hasActiveController;
   bool activeUsesLegacyProtocol;
