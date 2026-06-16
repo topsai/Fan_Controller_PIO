@@ -125,6 +125,9 @@ uint32_t diagnosticReceivedPackets = 0;
 uint32_t diagnosticLostPackets = 0;
 uint32_t diagnosticFaultCount = 0;
 uint32_t diagnosticIgnoredPackets = 0;
+uint32_t diagnosticMaxPacketGapMs = 0;
+uint32_t diagnosticLastPacketMs = 0;
+uint32_t diagnosticFailsafeCount = 0;
 ControllerSourceState controllerSource = {};
 
 int16_t smoothedThrottle = 0;
@@ -225,6 +228,7 @@ void applyControlPacketFromSource(
     }
     protocolRememberSequence(receivedSequence, lastControlSequence, hasControlSequence);
   }
+  updateReceiverPacketGapDiagnostics(nowMs, diagnosticLastPacketMs, diagnosticMaxPacketGapMs);
 
   const bool signalConnectionSuccess = shouldSignalReceiverConnectionSuccess(connected, failsafeActive);
 
@@ -487,6 +491,7 @@ void checkFailsafe() {
     hasControlSequence = false;
     sourceOutputLocked = true;
     failsafeBeepUntil = millis() + 1000;
+    diagnosticFailsafeCount++;
     Serial.println("失控保护启动！");
     beep(BEEP_FREQ_FAILSAFE, 1000);
     // for (int i = 0; i < 5; i++) {
@@ -600,10 +605,12 @@ void printDiagnosticStatus() {
                              diagnosticReceivedPackets,
                              diagnosticLostPackets,
                              diagnosticFaultCount);
-  Serial.printf("%s ignored=%lu active=%s\n",
+  Serial.printf("%s ignored=%lu active=%s max_gap_ms=%lu failsafes=%lu\n",
                 line,
                 (unsigned long)diagnosticIgnoredPackets,
-                controllerSource.hasActiveController ? controllerNameForMac(controllerSource.activeMac) : "none");
+                controllerSource.hasActiveController ? controllerNameForMac(controllerSource.activeMac) : "none",
+                (unsigned long)diagnosticMaxPacketGapMs,
+                (unsigned long)diagnosticFailsafeCount);
 }
 
 void handleDiagnosticCommand(const String &line) {

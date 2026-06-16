@@ -77,6 +77,8 @@ constexpr const char *CALIBRATION_CENTER_KEY = "center";
 constexpr const char *CALIBRATION_MIN_KEY = "min";
 constexpr const char *CALIBRATION_MAX_KEY = "max";
 constexpr const char *CALIBRATION_DEADZONE_KEY = "deadzone";
+constexpr const char *DISPLAY_NAMESPACE = "display";
+constexpr const char *DISPLAY_BRIGHTNESS_KEY = "brightness";
 constexpr int ARM_BRAKE_THRESHOLD = -900;
 constexpr uint32_t ARM_BRAKE_HOLD_MS = 3000;
 constexpr int THROTTLE_SLEW_STEP = 40;
@@ -365,6 +367,22 @@ void beep(uint16_t frequencyHz, uint16_t durationMs) {
 void setDisplayBrightness(uint8_t brightness) {
   currentBrightness = s3ClampUserBrightness(brightness);
   display.setBrightness(currentBrightness);
+}
+
+uint8_t loadUserBrightness() {
+  preferences.begin(DISPLAY_NAMESPACE, true);
+  const int storedBrightness = preferences.getInt(DISPLAY_BRIGHTNESS_KEY, -1);
+  preferences.end();
+  const uint8_t brightness = s3ResolveStoredBrightness(storedBrightness, LCD_BRIGHTNESS);
+  Serial.printf("S3 display brightness loaded: %u\n", brightness);
+  return brightness;
+}
+
+void saveUserBrightness() {
+  preferences.begin(DISPLAY_NAMESPACE, false);
+  preferences.putInt(DISPLAY_BRIGHTNESS_KEY, userBrightness);
+  preferences.end();
+  Serial.printf("S3 display brightness saved: %u\n", userBrightness);
 }
 
 void markUserActivity() {
@@ -770,6 +788,10 @@ void lvTouchReadCallback(lv_indev_drv_t *, lv_indev_data_t *data) {
         joystickValue = 0;
         beep(BEEP_FREQ_BUTTON, 50);
         break;
+      case S3UiTouchAction::PageChanged:
+        markUserActivity();
+        beep(BEEP_FREQ_BUTTON, 30);
+        break;
       case S3UiTouchAction::None:
       default:
         break;
@@ -1061,9 +1083,11 @@ void setup() {
   delay(1000);
   Serial.println();
   Serial.println("ESP32-S3 formal transmitter");
+  userBrightness = loadUserBrightness();
+  currentBrightness = userBrightness;
   Serial.printf("S3 power profile: CPU %uMHz, LCD brightness %u, WiFi TX %.1fdBm\n",
                 getCpuFrequencyMhz(),
-                LCD_BRIGHTNESS,
+                userBrightness,
                 S3_ESPNOW_TX_POWER_DBM_X4 / 4.0f);
 
   setupPins();
@@ -1129,8 +1153,13 @@ void loop() {
 
   uint8_t requestedBrightness = 0;
   if (s3_ui_consume_brightness_request(requestedBrightness)) {
-    userBrightness = s3ClampUserBrightness(requestedBrightness);
+    const uint8_t nextBrightness = s3ClampUserBrightness(requestedBrightness);
+    const bool brightnessChanged = nextBrightness != userBrightness;
+    userBrightness = nextBrightness;
     setDisplayBrightness(userBrightness);
+    if (brightnessChanged) {
+      saveUserBrightness();
+    }
     markUserActivity();
   }
 

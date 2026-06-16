@@ -95,6 +95,10 @@ inline int calibratedJoystickCenter(const int *samples, size_t sampleCount, int 
   return (int)((sum + (long)sampleCount / 2) / (long)sampleCount);
 }
 
+inline bool joystickCenterIsValid(int center) {
+  return center >= 1 && center <= 4094;
+}
+
 inline int16_t safeThrottleForArming(int16_t throttle, bool armed) {
   return armed ? throttle : 0;
 }
@@ -170,6 +174,16 @@ inline bool shouldEmitReceiverLinkAlert(
   }
 
   return false;
+}
+
+inline void updateReceiverPacketGapDiagnostics(uint32_t nowMs, uint32_t &lastPacketMs, uint32_t &maxGapMs) {
+  if (lastPacketMs != 0) {
+    const uint32_t gapMs = nowMs - lastPacketMs;
+    if (gapMs > maxGapMs) {
+      maxGapMs = gapMs;
+    }
+  }
+  lastPacketMs = nowMs;
 }
 
 inline bool shouldAllowRemoteHorn(

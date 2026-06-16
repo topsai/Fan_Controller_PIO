@@ -39,6 +39,15 @@ void test_joystick_center_calibration_averages_samples() {
   TEST_ASSERT_EQUAL_INT(2100, calibratedJoystickCenter(samples, 4, 2048));
 }
 
+void test_joystick_center_rejects_invalid_persisted_values() {
+  TEST_ASSERT_TRUE(joystickCenterIsValid(1));
+  TEST_ASSERT_TRUE(joystickCenterIsValid(2048));
+  TEST_ASSERT_TRUE(joystickCenterIsValid(4094));
+  TEST_ASSERT_FALSE(joystickCenterIsValid(0));
+  TEST_ASSERT_FALSE(joystickCenterIsValid(4095));
+  TEST_ASSERT_FALSE(joystickCenterIsValid(-1));
+}
+
 void test_joystick_calibration_rejects_invalid_persisted_values() {
   JoystickCalibration calibration = {2048, 0, 4095, 50};
   TEST_ASSERT_TRUE(joystickCalibrationIsValid(calibration));
@@ -141,6 +150,23 @@ void test_receiver_link_alert_is_silent_when_connected_and_not_failsafe() {
   TEST_ASSERT_FALSE(shouldEmitReceiverLinkAlert(true, false, 5000, lastAlertMs, hasAlerted, 2000));
   TEST_ASSERT_EQUAL_UINT32(0, lastAlertMs);
   TEST_ASSERT_FALSE(hasAlerted);
+}
+
+void test_receiver_packet_gap_diagnostics_track_max_gap() {
+  uint32_t lastPacketMs = 0;
+  uint32_t maxGapMs = 0;
+
+  updateReceiverPacketGapDiagnostics(1000, lastPacketMs, maxGapMs);
+  TEST_ASSERT_EQUAL_UINT32(1000, lastPacketMs);
+  TEST_ASSERT_EQUAL_UINT32(0, maxGapMs);
+
+  updateReceiverPacketGapDiagnostics(1080, lastPacketMs, maxGapMs);
+  TEST_ASSERT_EQUAL_UINT32(1080, lastPacketMs);
+  TEST_ASSERT_EQUAL_UINT32(80, maxGapMs);
+
+  updateReceiverPacketGapDiagnostics(2600, lastPacketMs, maxGapMs);
+  TEST_ASSERT_EQUAL_UINT32(2600, lastPacketMs);
+  TEST_ASSERT_EQUAL_UINT32(1520, maxGapMs);
 }
 
 void test_remote_horn_has_maximum_continuous_duration() {
@@ -470,11 +496,25 @@ void test_s3_receiver_status_text_decodes_flags() {
   TEST_ASSERT_EQUAL_STRING("电调 锁定", buffer);
 }
 
+void test_s3_persisted_brightness_uses_fallback_for_missing_value() {
+  TEST_ASSERT_EQUAL_UINT8(140, s3ResolveStoredBrightness(-1, 140));
+  TEST_ASSERT_EQUAL_UINT8(20, s3ResolveStoredBrightness(0, 140));
+  TEST_ASSERT_EQUAL_UINT8(180, s3ResolveStoredBrightness(180, 140));
+  TEST_ASSERT_EQUAL_UINT8(255, s3ResolveStoredBrightness(300, 140));
+}
+
 void test_s3_mcu_temperature_warning_threshold() {
   TEST_ASSERT_FALSE(s3McuTemperatureWarns(false, 90.0f, 75.0f));
   TEST_ASSERT_FALSE(s3McuTemperatureWarns(true, NAN, 75.0f));
   TEST_ASSERT_FALSE(s3McuTemperatureWarns(true, 74.9f, 75.0f));
   TEST_ASSERT_TRUE(s3McuTemperatureWarns(true, 75.0f, 75.0f));
+}
+
+void test_s3_swipe_direction_requires_horizontal_drag() {
+  TEST_ASSERT_EQUAL_INT8(1, s3SwipeDirectionForDrag(190, 120, 80, 124));
+  TEST_ASSERT_EQUAL_INT8(-1, s3SwipeDirectionForDrag(50, 120, 160, 118));
+  TEST_ASSERT_EQUAL_INT8(0, s3SwipeDirectionForDrag(100, 120, 130, 118));
+  TEST_ASSERT_EQUAL_INT8(0, s3SwipeDirectionForDrag(100, 40, 160, 130));
 }
 
 void test_s3_bmp280_altitude_uses_standard_sea_level_pressure() {
@@ -514,6 +554,7 @@ void setup() {
   RUN_TEST(test_pwm_mapping_defaults_invalid_speed_level_to_level_1);
   RUN_TEST(test_joystick_mapping_uses_calibrated_center_and_deadzone);
   RUN_TEST(test_joystick_center_calibration_averages_samples);
+  RUN_TEST(test_joystick_center_rejects_invalid_persisted_values);
   RUN_TEST(test_joystick_calibration_rejects_invalid_persisted_values);
   RUN_TEST(test_joystick_calibrated_mapping_uses_persisted_range);
   RUN_TEST(test_transmitter_safety_forces_zero_until_armed);
@@ -523,6 +564,7 @@ void setup() {
   RUN_TEST(test_receiver_failsafe_clears_all_stale_control_inputs);
   RUN_TEST(test_receiver_link_alert_beeps_immediately_then_every_two_seconds);
   RUN_TEST(test_receiver_link_alert_is_silent_when_connected_and_not_failsafe);
+  RUN_TEST(test_receiver_packet_gap_diagnostics_track_max_gap);
   RUN_TEST(test_remote_horn_has_maximum_continuous_duration);
   RUN_TEST(test_remote_horn_resets_after_button_release);
   RUN_TEST(test_beep_profiles_use_distinct_frequencies);
@@ -554,7 +596,9 @@ void setup() {
   RUN_TEST(test_s3_diagnostic_text_formats_link_quality);
   RUN_TEST(test_s3_ui_detail_text_helpers_format_product_pages);
   RUN_TEST(test_s3_receiver_status_text_decodes_flags);
+  RUN_TEST(test_s3_persisted_brightness_uses_fallback_for_missing_value);
   RUN_TEST(test_s3_mcu_temperature_warning_threshold);
+  RUN_TEST(test_s3_swipe_direction_requires_horizontal_drag);
   RUN_TEST(test_s3_bmp280_altitude_uses_standard_sea_level_pressure);
   RUN_TEST(test_s3_cw2015_reading_rejects_transient_zero_or_nan_values);
   RUN_TEST(test_s3_bmp280_reading_rejects_transient_zero_or_nan_values);

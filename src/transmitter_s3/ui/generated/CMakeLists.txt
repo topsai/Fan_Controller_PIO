@@ -1,11 +1,15 @@
 SET(SOURCES ui_comp_uiarcbattery.c
     ui_comp.c
-    ui_Screen1.c
+    ui_ScreenMain.c
+    ui_ScreenDiag.c
+    ui_ScreenCal.c
+    ui_ScreenSystem.c
     ui.c
     ui_comp_hook.c
     ui_helpers.c
     ui_img_bg3_png.c
     ui_img_11_png.c
+    fonts/ui_font_ChineseSmall.c
     fonts/ui_font_H1.c
     fonts/ui_font_Number_big.c
     fonts/ui_font_Number_extra.c

@@ -124,6 +124,19 @@ inline bool s3McuTemperatureWarns(bool valid, float temperatureC, float warnThre
   return valid && isfinite(temperatureC) && temperatureC >= warnThresholdC;
 }
 
+inline int8_t s3SwipeDirectionForDrag(int16_t startX,
+                                      int16_t startY,
+                                      int16_t endX,
+                                      int16_t endY,
+                                      int16_t thresholdPx = 45) {
+  const int16_t dx = endX - startX;
+  const int16_t dy = endY - startY;
+  if (abs(dx) < thresholdPx || abs(dx) < abs(dy) * 2) {
+    return 0;
+  }
+  return dx < 0 ? 1 : -1;
+}
+
 inline void s3FormatLinkDiagnosticText(char *buffer, size_t bufferSize, int16_t rssi, uint16_t packetRateHz, uint16_t lostPackets) {
   if (bufferSize == 0) {
     return;
@@ -187,6 +200,13 @@ inline void s3FormatBrightnessText(char *buffer, size_t bufferSize, uint8_t brig
 
 inline uint8_t s3ClampUserBrightness(int value) {
   return (uint8_t)clampInt(value, 20, 255);
+}
+
+inline uint8_t s3ResolveStoredBrightness(int storedValue, uint8_t fallbackBrightness) {
+  if (storedValue < 0) {
+    return s3ClampUserBrightness(fallbackBrightness);
+  }
+  return s3ClampUserBrightness(storedValue);
 }
 
 inline void s3FormatPowerModeText(char *buffer, size_t bufferSize, bool standby, bool dimmed) {

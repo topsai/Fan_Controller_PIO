@@ -26,9 +26,31 @@ extern lv_obj_t *ui_LabelPowerMode __attribute__((weak));
 extern lv_obj_t *ui_LabelUpgrade __attribute__((weak));
 extern lv_obj_t *ui_SliderBrightness __attribute__((weak));
 extern const lv_font_t ui_font_ChineseSmall __attribute__((weak));
+extern lv_obj_t *ui_ScreenMain __attribute__((weak));
+extern lv_obj_t *ui_ScreenDiag __attribute__((weak));
+extern lv_obj_t *ui_ScreenCal __attribute__((weak));
+extern lv_obj_t *ui_ScreenSystem __attribute__((weak));
+extern void ui_ScreenMain_screen_init(void) __attribute__((weak));
+extern void ui_ScreenDiag_screen_init(void) __attribute__((weak));
+extern void ui_ScreenCal_screen_init(void) __attribute__((weak));
+extern void ui_ScreenSystem_screen_init(void) __attribute__((weak));
 }
 
 namespace {
+
+using ScreenInitFn = void (*)();
+
+struct S3UiPage {
+  lv_obj_t **screen;
+  ScreenInitFn init;
+};
+
+S3UiPage pages[] = {
+  {&ui_ScreenMain, ui_ScreenMain_screen_init},
+  {&ui_ScreenDiag, ui_ScreenDiag_screen_init},
+  {&ui_ScreenCal, ui_ScreenCal_screen_init},
+  {&ui_ScreenSystem, ui_ScreenSystem_screen_init},
+};
 
 lv_obj_t *settingsPanel = nullptr;
 lv_obj_t *settingsTitleLabel = nullptr;
@@ -40,11 +62,49 @@ lv_obj_t *settingsCalButton = nullptr;
 lv_obj_t *settingsCloseButton = nullptr;
 bool settingsVisible = false;
 bool touchWasPressed = false;
+int16_t touchStartX = 0;
+int16_t touchStartY = 0;
+int16_t touchLastX = 0;
+int16_t touchLastY = 0;
+uint8_t activePageIndex = 0;
+lv_obj_t *configuredBrightnessSlider = nullptr;
 bool brightnessRequestPending = false;
 uint8_t brightnessRequest = 0;
 
 lv_obj_t *optionalUiObject(lv_obj_t **symbol) {
   return symbol == nullptr ? nullptr : *symbol;
+}
+
+bool ensurePageCreated(uint8_t pageIndex) {
+  if (pageIndex >= sizeof(pages) / sizeof(pages[0]) || pages[pageIndex].screen == nullptr) {
+    return false;
+  }
+  if (*pages[pageIndex].screen == nullptr && pages[pageIndex].init != nullptr) {
+    pages[pageIndex].init();
+  }
+  return *pages[pageIndex].screen != nullptr;
+}
+
+bool loadPage(uint8_t pageIndex, int8_t direction) {
+  if (pageIndex == activePageIndex || !ensurePageCreated(pageIndex)) {
+    return false;
+  }
+  lv_scr_load_anim_t animation = direction > 0 ? LV_SCR_LOAD_ANIM_MOVE_LEFT : LV_SCR_LOAD_ANIM_MOVE_RIGHT;
+  lv_scr_load_anim(*pages[pageIndex].screen, animation, 180, 0, false);
+  activePageIndex = pageIndex;
+  return true;
+}
+
+bool movePage(int8_t direction) {
+  const uint8_t pageCount = sizeof(pages) / sizeof(pages[0]);
+  for (uint8_t offset = 1; offset < pageCount; offset++) {
+    const int next = (int)activePageIndex + direction * offset + pageCount;
+    const uint8_t candidate = (uint8_t)(next % pageCount);
+    if (loadPage(candidate, direction)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void applyChineseFont(lv_obj_t *object) {
@@ -186,12 +246,35 @@ void brightnessSliderEvent(lv_event_t *event) {
   brightnessRequestPending = true;
 }
 
+void configureBrightnessSlider() {
+  lv_obj_t *slider = brightnessSlider();
+  if (slider == nullptr || slider == configuredBrightnessSlider) {
+    return;
+  }
+  lv_obj_add_flag(slider, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(slider, LV_OBJ_FLAG_SCROLLABLE);
+  lv_slider_set_range(slider, 20, 255);
+  lv_slider_set_value(slider, 140, LV_ANIM_OFF);
+  lv_obj_set_style_bg_color(slider, lv_color_hex(0x26323C), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(slider, lv_color_hex(0x00D86A), LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(slider, lv_color_hex(0xFFFFFF), LV_PART_KNOB);
+  lv_obj_set_style_pad_all(slider, 3, LV_PART_KNOB);
+  lv_obj_add_event_cb(slider, brightnessSliderEvent, LV_EVENT_VALUE_CHANGED, nullptr);
+  configuredBrightnessSlider = slider;
+}
+
 lv_obj_t *createSettingsButton(lv_obj_t *parent, const char *text, int16_t x, int16_t y, int16_t w, int16_t h) {
   lv_obj_t *button = lv_btn_create(parent);
   lv_obj_set_size(button, w, h);
   lv_obj_set_pos(button, x, y);
   lv_obj_set_style_radius(button, 6, LV_PART_MAIN);
-  lv_obj_set_style_bg_color(button, lv_color_hex(0x202833), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(button, lv_color_hex(0x22303A), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(button, lv_color_hex(0x00A4C7), LV_STATE_PRESSED);
+  lv_obj_set_style_border_width(button, 1, LV_PART_MAIN);
+  lv_obj_set_style_border_color(button, lv_color_hex(0x3B4B56), LV_PART_MAIN);
+  lv_obj_set_style_shadow_width(button, 8, LV_PART_MAIN);
+  lv_obj_set_style_shadow_opa(button, LV_OPA_20, LV_PART_MAIN);
+  lv_obj_set_style_shadow_color(button, lv_color_black(), LV_PART_MAIN);
   lv_obj_t *label = lv_label_create(button);
   lv_label_set_text(label, text);
   applyChineseFont(label);
@@ -206,37 +289,50 @@ void createSettingsPanel() {
   }
 
   settingsPanel = lv_obj_create(lv_scr_act());
-  lv_obj_set_size(settingsPanel, 210, 170);
+  lv_obj_set_size(settingsPanel, 220, 178);
   lv_obj_align(settingsPanel, LV_ALIGN_CENTER, 0, 0);
   lv_obj_set_style_radius(settingsPanel, 8, LV_PART_MAIN);
-  lv_obj_set_style_bg_color(settingsPanel, lv_color_hex(0x101820), LV_PART_MAIN);
-  lv_obj_set_style_bg_opa(settingsPanel, LV_OPA_90, LV_PART_MAIN);
-  lv_obj_set_style_border_color(settingsPanel, lv_color_hex(0x00D8FF), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(settingsPanel, lv_color_hex(0x0B1218), LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(settingsPanel, 242, LV_PART_MAIN);
+  lv_obj_set_style_border_color(settingsPanel, lv_color_hex(0x2A4150), LV_PART_MAIN);
   lv_obj_set_style_border_width(settingsPanel, 1, LV_PART_MAIN);
+  lv_obj_set_style_pad_all(settingsPanel, 0, LV_PART_MAIN);
+  lv_obj_set_style_shadow_width(settingsPanel, 18, LV_PART_MAIN);
+  lv_obj_set_style_shadow_opa(settingsPanel, LV_OPA_40, LV_PART_MAIN);
+  lv_obj_set_style_shadow_color(settingsPanel, lv_color_black(), LV_PART_MAIN);
   lv_obj_clear_flag(settingsPanel, LV_OBJ_FLAG_SCROLLABLE);
 
-  settingsTitleLabel = lv_label_create(settingsPanel);
+  lv_obj_t *titleBar = lv_obj_create(settingsPanel);
+  lv_obj_set_size(titleBar, 218, 32);
+  lv_obj_set_pos(titleBar, 0, 0);
+  lv_obj_set_style_radius(titleBar, 8, LV_PART_MAIN);
+  lv_obj_set_style_bg_color(titleBar, lv_color_hex(0x132531), LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(titleBar, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_border_width(titleBar, 0, LV_PART_MAIN);
+  lv_obj_clear_flag(titleBar, LV_OBJ_FLAG_SCROLLABLE);
+
+  settingsTitleLabel = lv_label_create(titleBar);
   lv_label_set_text(settingsTitleLabel, "摇杆设置");
   applyChineseFont(settingsTitleLabel);
-  lv_obj_set_style_text_color(settingsTitleLabel, lv_color_hex(0x00D8FF), LV_PART_MAIN);
-  lv_obj_align(settingsTitleLabel, LV_ALIGN_TOP_MID, 0, 8);
+  lv_obj_set_style_text_color(settingsTitleLabel, lv_color_hex(0x7DEBFF), LV_PART_MAIN);
+  lv_obj_align(settingsTitleLabel, LV_ALIGN_CENTER, 0, 0);
 
   settingsCenterLabel = lv_label_create(settingsPanel);
   lv_label_set_text(settingsCenterLabel, "中心 2048");
   applyChineseFont(settingsCenterLabel);
   lv_obj_set_style_text_color(settingsCenterLabel, lv_color_white(), LV_PART_MAIN);
-  lv_obj_align(settingsCenterLabel, LV_ALIGN_TOP_MID, 0, 36);
+  lv_obj_align(settingsCenterLabel, LV_ALIGN_TOP_MID, 0, 45);
 
-  settingsMinusButton = createSettingsButton(settingsPanel, "-10", 12, 68, 52, 36);
-  settingsCalButton = createSettingsButton(settingsPanel, "校准", 78, 68, 52, 36);
-  settingsPlusButton = createSettingsButton(settingsPanel, "+10", 144, 68, 52, 36);
-  settingsCloseButton = createSettingsButton(settingsPanel, "退出", 60, 116, 90, 34);
+  settingsMinusButton = createSettingsButton(settingsPanel, "-10", 14, 72, 54, 38);
+  settingsCalButton = createSettingsButton(settingsPanel, "校准", 83, 72, 54, 38);
+  settingsPlusButton = createSettingsButton(settingsPanel, "+10", 152, 72, 54, 38);
+  settingsCloseButton = createSettingsButton(settingsPanel, "退出", 57, 124, 106, 34);
 
   settingsHintLabel = lv_label_create(settingsPanel);
   lv_label_set_text(settingsHintLabel, "输出锁定");
   applyChineseFont(settingsHintLabel);
-  lv_obj_set_style_text_color(settingsHintLabel, lv_color_hex(0xFFD23F), LV_PART_MAIN);
-  lv_obj_align(settingsHintLabel, LV_ALIGN_BOTTOM_MID, 0, -4);
+  lv_obj_set_style_text_color(settingsHintLabel, lv_color_hex(0xFFD86B), LV_PART_MAIN);
+  lv_obj_align(settingsHintLabel, LV_ALIGN_BOTTOM_MID, 0, -6);
 
   lv_obj_add_flag(settingsPanel, LV_OBJ_FLAG_HIDDEN);
 }
@@ -387,11 +483,7 @@ void s3_ui_init() {
     lv_label_set_text(upgradeLabel(), buffer);
     applyChineseFont(upgradeLabel());
   }
-  if (brightnessSlider() != nullptr) {
-    lv_slider_set_range(brightnessSlider(), 20, 255);
-    lv_slider_set_value(brightnessSlider(), 140, LV_ANIM_OFF);
-    lv_obj_add_event_cb(brightnessSlider(), brightnessSliderEvent, LV_EVENT_VALUE_CHANGED, nullptr);
-  }
+  configureBrightnessSlider();
 
   createSettingsPanel();
 }
@@ -444,7 +536,7 @@ void s3_ui_update(const S3UiState &state) {
 
   if (bmp280ValueLabel() != nullptr) {
     if (state.bmp280Valid) {
-      snprintf(buffer, sizeof(buffer), "%.0fhPa\n%.0fm", state.bmp280PressureHpa, state.bmp280AltitudeM);
+      snprintf(buffer, sizeof(buffer), "%.0fhPa\n%.0f米", state.bmp280PressureHpa, state.bmp280AltitudeM);
     } else {
       snprintf(buffer, sizeof(buffer), "气压 --\n高度 --");
     }
@@ -550,6 +642,7 @@ void s3_ui_update(const S3UiState &state) {
     s3FormatUpgradeText(buffer, sizeof(buffer));
     lv_label_set_text(upgradeLabel(), buffer);
   }
+  configureBrightnessSlider();
   if (brightnessSlider() != nullptr && !lv_obj_has_state(brightnessSlider(), LV_STATE_PRESSED)) {
     lv_slider_set_value(brightnessSlider(), state.displayBrightness, LV_ANIM_OFF);
   }
@@ -587,41 +680,61 @@ bool s3_ui_consume_brightness_request(uint8_t &brightness) {
 }
 
 S3UiTouchAction s3_ui_set_touch(bool pressed, int16_t x, int16_t y) {
-  if (!pressed) {
-    touchWasPressed = false;
+  if (pressed && !touchWasPressed) {
+    touchWasPressed = true;
+    touchStartX = x;
+    touchStartY = y;
+    touchLastX = x;
+    touchLastY = y;
     return S3UiTouchAction::None;
   }
-  if (touchWasPressed) {
-    return S3UiTouchAction::None;
-  }
-  touchWasPressed = true;
 
-  if (touchInside(joyCalButton(), x, y)) {
+  if (pressed) {
+    touchLastX = x;
+    touchLastY = y;
+    return S3UiTouchAction::None;
+  }
+
+  if (!touchWasPressed) {
+    return S3UiTouchAction::None;
+  }
+  touchWasPressed = false;
+
+  if (touchInside(brightnessSlider(), touchStartX, touchStartY)) {
+    return S3UiTouchAction::None;
+  }
+
+  const int8_t swipeDirection = s3SwipeDirectionForDrag(touchStartX, touchStartY, touchLastX, touchLastY);
+  if (!settingsVisible && swipeDirection != 0 && movePage(swipeDirection)) {
+    return S3UiTouchAction::PageChanged;
+  }
+
+  if (touchInside(joyCalButton(), touchStartX, touchStartY)) {
     return S3UiTouchAction::CalibrateCenter;
   }
-  if (touchInside(joyMinusButton(), x, y)) {
+  if (touchInside(joyMinusButton(), touchStartX, touchStartY)) {
     return S3UiTouchAction::CenterMinus;
   }
-  if (touchInside(joyPlusButton(), x, y)) {
+  if (touchInside(joyPlusButton(), touchStartX, touchStartY)) {
     return S3UiTouchAction::CenterPlus;
   }
-  if (touchInside(joyResetButton(), x, y)) {
+  if (touchInside(joyResetButton(), touchStartX, touchStartY)) {
     return S3UiTouchAction::ResetCalibration;
   }
   if (!settingsVisible) {
     return S3UiTouchAction::None;
   }
 
-  if (touchInside(settingsCalButton, x, y)) {
+  if (touchInside(settingsCalButton, touchStartX, touchStartY)) {
     return S3UiTouchAction::CalibrateCenter;
   }
-  if (touchInside(settingsMinusButton, x, y)) {
+  if (touchInside(settingsMinusButton, touchStartX, touchStartY)) {
     return S3UiTouchAction::CenterMinus;
   }
-  if (touchInside(settingsPlusButton, x, y)) {
+  if (touchInside(settingsPlusButton, touchStartX, touchStartY)) {
     return S3UiTouchAction::CenterPlus;
   }
-  if (touchInside(settingsCloseButton, x, y)) {
+  if (touchInside(settingsCloseButton, touchStartX, touchStartY)) {
     return S3UiTouchAction::CloseSettings;
   }
   return S3UiTouchAction::None;

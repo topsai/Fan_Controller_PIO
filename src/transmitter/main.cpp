@@ -11,6 +11,7 @@
 #include <Arduino.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
+#include <Preferences.h>
 #include <WiFi.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -49,6 +50,8 @@
 #define THROTTLE_SLEW_STEP 40
 #define TAKEOVER_LONG_PRESS_MS 3000
 #define TAKEOVER_REQUEST_WINDOW_MS 1000
+#define SETTINGS_NAMESPACE "tx_cfg"
+#define JOYSTICK_CENTER_KEY "joy_center"
 
 // ========== CW2015寄存器 ==========
 #define CW2015_ADDR 0x62         // CW2015 I2C地址 [^43^]
@@ -108,6 +111,7 @@ void onDataRecv(const uint8_t *mac, const uint8_t *data, int len);
 // ========== 全局变量 ==========
 uint8_t receiverMac[] = RECEIVER_MAC;
 Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, -1);
+Preferences preferences;
 
 // 硬件定时器
 hw_timer_t *controlTimer = NULL;
@@ -195,7 +199,22 @@ void calibrateJoystickCenter() {
     delay(2);
   }
   joystickCenter = calibratedJoystickCenter(samples, sampleCount, ADC_CENTER);
+  preferences.begin(SETTINGS_NAMESPACE, false);
+  preferences.putInt(JOYSTICK_CENTER_KEY, joystickCenter);
+  preferences.end();
   Serial.printf("摇杆中位校准完成: %d\n", joystickCenter);
+}
+
+bool loadJoystickCenter() {
+  preferences.begin(SETTINGS_NAMESPACE, true);
+  const int storedCenter = preferences.getInt(JOYSTICK_CENTER_KEY, -1);
+  preferences.end();
+  if (!joystickCenterIsValid(storedCenter)) {
+    return false;
+  }
+  joystickCenter = storedCenter;
+  Serial.printf("摇杆中位已加载: %d\n", joystickCenter);
+  return true;
 }
 
 void setupOLED() {
@@ -573,12 +592,20 @@ void updateDisplay() {
   display.setCursor(0, 0);
 
   if (settingsMode) {
-    display.println("SETTINGS");
-    display.printf("Center:%d\n", joystickCenter);
-    display.printf("Raw:%4d Out:%4d\n", joystickRawValue, joystickValue);
-    display.println("B2: Cal center");
-    display.println("B1: Exit");
-    display.println("Output locked");
+    display.drawRoundRect(0, 0, OLED_WIDTH, OLED_HEIGHT, 4, SSD1306_WHITE);
+    display.fillRect(0, 0, OLED_WIDTH, 12, SSD1306_WHITE);
+    display.setTextColor(SSD1306_BLACK);
+    display.setCursor(4, 2);
+    display.print("SETTINGS");
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(4, 16);
+    display.printf("Center %4d", joystickCenter);
+    display.setCursor(4, 28);
+    display.printf("Raw %4d Out %4d", joystickRawValue, joystickValue);
+    display.setCursor(4, 42);
+    display.print("B2 Cal   B1 Exit");
+    display.setCursor(4, 54);
+    display.print("LOCKED / SAVED");
     display.display();
     return;
   }
@@ -633,7 +660,9 @@ void setup() {
   Serial.println("=================================");
 
   setupPins();
-  calibrateJoystickCenter();
+  if (!loadJoystickCenter()) {
+    calibrateJoystickCenter();
+  }
   setupOLED();
   cw2015Available = cw2015Init();
   if (cw2015Available) {

@@ -28,12 +28,18 @@ extern "C" {
 #include "ui_events.h"
 
 
-///////////////////// SCREENS ////////////////////
-#include "ui_Screen1.h"
+///////////////////// SCREENS ////////////////////
 
-///////////////////// VARIABLES ////////////////////
+#include "ui_ScreenMain.h"
+#include "ui_ScreenDiag.h"
+#include "ui_ScreenCal.h"
+#include "ui_ScreenSystem.h"
 
-// EVENTS
+///////////////////// VARIABLES ////////////////////
+
+
+// EVENTS
+
 extern lv_obj_t *ui____initial_actions0;
 
 // IMAGES AND IMAGE SETS
@@ -41,6 +47,7 @@ LV_IMG_DECLARE( ui_img_bg3_png);   // assets/bg3.png
 LV_IMG_DECLARE( ui_img_11_png);   // assets/11.png
 
 // FONTS
+LV_FONT_DECLARE( ui_font_ChineseSmall);
 LV_FONT_DECLARE( ui_font_H1);
 LV_FONT_DECLARE( ui_font_Number_big);
 LV_FONT_DECLARE( ui_font_Number_extra);

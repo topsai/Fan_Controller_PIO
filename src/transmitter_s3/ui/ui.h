@@ -47,6 +47,7 @@ enum class S3UiTouchAction : uint8_t {
   CenterPlus,
   ResetCalibration,
   CloseSettings,
+  PageChanged,
 };
 
 void s3_ui_init();
