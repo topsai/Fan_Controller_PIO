@@ -65,6 +65,10 @@ void test_c3_chinese_font_contains_required_ui_glyphs() {
   }
 }
 
+void test_c3_chinese_font_uses_smaller_render_size() {
+  TEST_ASSERT_EQUAL_UINT8(14, C3_CHINESE_RENDER_FONT_SIZE);
+}
+
 void test_joystick_calibration_rejects_invalid_persisted_values() {
   JoystickCalibration calibration = {2048, 0, 4095, 50};
   TEST_ASSERT_TRUE(joystickCalibrationIsValid(calibration));
@@ -574,6 +578,7 @@ void setup() {
   RUN_TEST(test_joystick_center_rejects_invalid_persisted_values);
   RUN_TEST(test_joystick_center_adjustment_clamps_to_valid_range);
   RUN_TEST(test_c3_chinese_font_contains_required_ui_glyphs);
+  RUN_TEST(test_c3_chinese_font_uses_smaller_render_size);
   RUN_TEST(test_joystick_calibration_rejects_invalid_persisted_values);
   RUN_TEST(test_joystick_calibrated_mapping_uses_persisted_range);
   RUN_TEST(test_transmitter_safety_forces_zero_until_armed);
