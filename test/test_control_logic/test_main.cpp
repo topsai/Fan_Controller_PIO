@@ -81,6 +81,12 @@ void test_c3_home_layout_uses_original_layout_with_chinese_labels() {
   TEST_ASSERT_EQUAL_STRING(u8"量", c3HomeBatteryLabel(false));
 }
 
+void test_c3_home_layout_uses_readable_chinese_metrics() {
+  TEST_ASSERT_EQUAL_UINT8(16, C3_CHINESE_GLYPH_HEIGHT);
+  TEST_ASSERT_EQUAL_UINT8(3, c3HomeSpeedTextSize());
+  TEST_ASSERT_TRUE(c3HomeUsesReadableChineseLabels());
+}
+
 void test_joystick_calibration_rejects_invalid_persisted_values() {
   JoystickCalibration calibration = {2048, 0, 4095, 50};
   TEST_ASSERT_TRUE(joystickCalibrationIsValid(calibration));
@@ -592,6 +598,7 @@ void setup() {
   RUN_TEST(test_c3_chinese_font_contains_required_ui_glyphs);
   RUN_TEST(test_c3_chinese_font_uses_smaller_render_size);
   RUN_TEST(test_c3_home_layout_uses_original_layout_with_chinese_labels);
+  RUN_TEST(test_c3_home_layout_uses_readable_chinese_metrics);
   RUN_TEST(test_joystick_calibration_rejects_invalid_persisted_values);
   RUN_TEST(test_joystick_calibrated_mapping_uses_persisted_range);
   RUN_TEST(test_transmitter_safety_forces_zero_until_armed);

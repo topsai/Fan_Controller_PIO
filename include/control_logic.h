@@ -119,6 +119,14 @@ inline const char *c3HomeBatteryLabel(bool batteryAvailable) {
   return u8"\u91CF";
 }
 
+inline uint8_t c3HomeSpeedTextSize() {
+  return 3;
+}
+
+inline bool c3HomeUsesReadableChineseLabels() {
+  return true;
+}
+
 inline int16_t safeThrottleForArming(int16_t throttle, bool armed) {
   return armed ? throttle : 0;
 }
