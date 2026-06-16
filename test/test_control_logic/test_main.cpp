@@ -69,6 +69,18 @@ void test_c3_chinese_font_uses_smaller_render_size() {
   TEST_ASSERT_EQUAL_UINT8(13, C3_CHINESE_RENDER_FONT_SIZE);
 }
 
+void test_c3_home_layout_uses_original_ascii_labels() {
+  TEST_ASSERT_EQUAL_STRING("[OK]", c3HomeLinkLabel(true));
+  TEST_ASSERT_EQUAL_STRING("[LOST]", c3HomeLinkLabel(false));
+  TEST_ASSERT_EQUAL_STRING("ARM", c3HomeArmLabel(true));
+  TEST_ASSERT_EQUAL_STRING("LOCK", c3HomeArmLabel(false));
+  TEST_ASSERT_EQUAL_STRING("THR", c3HomeDirectionLabel(1));
+  TEST_ASSERT_EQUAL_STRING("BRK", c3HomeDirectionLabel(0));
+  TEST_ASSERT_EQUAL_STRING("BRK", c3HomeDirectionLabel(-1));
+  TEST_ASSERT_EQUAL_STRING("SOC", c3HomeBatteryLabel(true));
+  TEST_ASSERT_EQUAL_STRING("N/A", c3HomeBatteryLabel(false));
+}
+
 void test_joystick_calibration_rejects_invalid_persisted_values() {
   JoystickCalibration calibration = {2048, 0, 4095, 50};
   TEST_ASSERT_TRUE(joystickCalibrationIsValid(calibration));
@@ -579,6 +591,7 @@ void setup() {
   RUN_TEST(test_joystick_center_adjustment_clamps_to_valid_range);
   RUN_TEST(test_c3_chinese_font_contains_required_ui_glyphs);
   RUN_TEST(test_c3_chinese_font_uses_smaller_render_size);
+  RUN_TEST(test_c3_home_layout_uses_original_ascii_labels);
   RUN_TEST(test_joystick_calibration_rejects_invalid_persisted_values);
   RUN_TEST(test_joystick_calibrated_mapping_uses_persisted_range);
   RUN_TEST(test_transmitter_safety_forces_zero_until_armed);

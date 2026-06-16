@@ -634,52 +634,36 @@ void updateDisplay() {
 
   // 第1行：连接状态和信号
   if (connected) {
-    int16_t x = drawC3Text(0, 0, u8"连接");
-    display.setCursor(x + 2, 4);
-    display.printf("%.1fV", voltageValue / 100.0);
+    display.printf("%s  BAT:%.2fV\n", c3HomeLinkLabel(true), voltageValue / 100.0);
   } else {
-    drawC3Text(0, 0, u8"断线");
+    display.println(c3HomeLinkLabel(false));
   }
 
-  // 第2行：速度档位和电压
-  // display.printf("SPD:%d\n", speedLevel);
-
-  // 第3行：油门/刹车值
-  const bool throttleForward = joystickValue > 0;
-  const char *direction = throttleForward ? "THR" : "BRK";
-  // display.printf("%s:%4d  BTN:%02X\n", direction, abs(joystickValue), buttonState);
-  int16_t x = drawC3Text(0, 16, transmitterArmed ? u8"已连接" : u8"锁定");
-  display.setCursor(x + 2, 20);
-  display.printf("L%d", speedLevel);
-  x = drawC3Text(64, 16, throttleForward ? u8"油门" : u8"刹车");
-  display.setCursor(x + 2, 20);
-  display.printf("%4d", abs(joystickValue));
+  // 第2行：速度档位和油门/刹车值
+  const char *direction = c3HomeDirectionLabel(joystickValue);
+  display.printf("%s SPD:%d %s:%4d\n", c3HomeArmLabel(transmitterArmed), speedLevel, direction, abs(joystickValue));
   if (!transmitterArmed && joystickRawValue <= ARM_BRAKE_THRESHOLD) {
-    display.setCursor(0, 28);
-    display.print("BRK 3s");
+    display.println("Hold BRK 3s");
   }
-  display.setTextSize(3);
-  // display.println("30 KM");
+
+  display.setTextSize(4);
   if (connected) {
-    display.setCursor(0, 34);
-    display.printf("%2d", speedValue);
-    drawC3Text(44, 40, u8"速度");
+    display.printf("%2d KM\n", speedValue);
   } else {
-    display.setCursor(0, 34);
-    display.printf("N/A");
+    display.printf("N/A\n");
   }
 
   display.setTextSize(1);
 
   // 第4行: 电量百分比 + 本地电池电压
-  x = drawC3Text(82, 40, u8"电量");
-  display.setCursor(x + 1, 44);
-  display.printf("%3d%%", localBatteryPercent);
+  display.printf("%s:%3d%% BAT:%.2fV\n", c3HomeBatteryLabel(cw2015Available), localBatteryPercent, localBatteryVoltage);
 
   // 第5行：可视化条
   int barWidth = map(abs(joystickValue), 0, 1000, 0, 60);
-  display.drawRect(82, 56, 42, 6, SSD1306_WHITE);
-  display.fillRect(84, 58, map(barWidth, 0, 60, 0, 38), 2, SSD1306_WHITE);
+  display.print(direction);
+  display.print(":");
+  for (int i = 0; i < barWidth / 6; i++) display.print("=");
+  display.println();
 
   display.display();
 }
