@@ -48,6 +48,13 @@ void test_joystick_center_rejects_invalid_persisted_values() {
   TEST_ASSERT_FALSE(joystickCenterIsValid(-1));
 }
 
+void test_joystick_center_adjustment_clamps_to_valid_range() {
+  TEST_ASSERT_EQUAL_INT(2058, adjustedJoystickCenter(2048, 10));
+  TEST_ASSERT_EQUAL_INT(2038, adjustedJoystickCenter(2048, -10));
+  TEST_ASSERT_EQUAL_INT(1, adjustedJoystickCenter(4, -10));
+  TEST_ASSERT_EQUAL_INT(4094, adjustedJoystickCenter(4090, 10));
+}
+
 void test_joystick_calibration_rejects_invalid_persisted_values() {
   JoystickCalibration calibration = {2048, 0, 4095, 50};
   TEST_ASSERT_TRUE(joystickCalibrationIsValid(calibration));
@@ -555,6 +562,7 @@ void setup() {
   RUN_TEST(test_joystick_mapping_uses_calibrated_center_and_deadzone);
   RUN_TEST(test_joystick_center_calibration_averages_samples);
   RUN_TEST(test_joystick_center_rejects_invalid_persisted_values);
+  RUN_TEST(test_joystick_center_adjustment_clamps_to_valid_range);
   RUN_TEST(test_joystick_calibration_rejects_invalid_persisted_values);
   RUN_TEST(test_joystick_calibrated_mapping_uses_persisted_range);
   RUN_TEST(test_transmitter_safety_forces_zero_until_armed);

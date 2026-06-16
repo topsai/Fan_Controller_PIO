@@ -99,6 +99,10 @@ inline bool joystickCenterIsValid(int center) {
   return center >= 1 && center <= 4094;
 }
 
+inline int adjustedJoystickCenter(int center, int delta) {
+  return clampInt(center + delta, 1, 4094);
+}
+
 inline int16_t safeThrottleForArming(int16_t throttle, bool armed) {
   return armed ? throttle : 0;
 }

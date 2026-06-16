@@ -603,9 +603,9 @@ void updateDisplay() {
     display.setCursor(4, 28);
     display.printf("Raw %4d Out %4d", joystickRawValue, joystickValue);
     display.setCursor(4, 42);
-    display.print("B2 Cal   B1 Exit");
+    display.print("B2 SetMid B1 Exit");
     display.setCursor(4, 54);
-    display.print("LOCKED / SAVED");
+    display.print("Current ADC saved");
     display.display();
     return;
   }

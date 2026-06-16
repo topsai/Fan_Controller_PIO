@@ -744,6 +744,51 @@ void lvFlushCallback(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *col
   lv_disp_flush_ready(disp);
 }
 
+void handleS3TouchAction(S3UiTouchAction action) {
+  switch (action) {
+    case S3UiTouchAction::CalibrateCenter:
+      joystickCalibrateRequested = true;
+      markUserActivity();
+      beep(BEEP_FREQ_BUTTON, 50);
+      break;
+    case S3UiTouchAction::CenterMinus:
+      joystickCenterAdjust -= JOYSTICK_CENTER_ADJUST_STEP;
+      markUserActivity();
+      beep(BEEP_FREQ_BUTTON, 30);
+      break;
+    case S3UiTouchAction::CenterPlus:
+      joystickCenterAdjust += JOYSTICK_CENTER_ADJUST_STEP;
+      markUserActivity();
+      beep(BEEP_FREQ_BUTTON, 30);
+      break;
+    case S3UiTouchAction::ResetCalibration:
+      joystickCalibration = {ADC_CENTER, 0, 4095, JOYSTICK_DEADZONE};
+      joystickCenter = ADC_CENTER;
+      saveJoystickCalibration();
+      markUserActivity();
+      transmitterArmed = false;
+      armBrakeHolding = false;
+      joystickValue = 0;
+      beep(BEEP_FREQ_BUTTON, 50);
+      break;
+    case S3UiTouchAction::CloseSettings:
+      settingsMode = false;
+      markUserActivity();
+      transmitterArmed = false;
+      armBrakeHolding = false;
+      joystickValue = 0;
+      beep(BEEP_FREQ_BUTTON, 50);
+      break;
+    case S3UiTouchAction::PageChanged:
+      markUserActivity();
+      beep(BEEP_FREQ_BUTTON, 30);
+      break;
+    case S3UiTouchAction::None:
+    default:
+      break;
+  }
+}
+
 void lvTouchReadCallback(lv_indev_drv_t *, lv_indev_data_t *data) {
   uint16_t rawX = 0;
   uint16_t rawY = 0;
@@ -753,53 +798,11 @@ void lvTouchReadCallback(lv_indev_drv_t *, lv_indev_data_t *data) {
     data->state = LV_INDEV_STATE_PRESSED;
     data->point.x = x;
     data->point.y = y;
-    const S3UiTouchAction action = s3_ui_set_touch(true, x, y);
-    switch (action) {
-      case S3UiTouchAction::CalibrateCenter:
-        joystickCalibrateRequested = true;
-        markUserActivity();
-        beep(BEEP_FREQ_BUTTON, 50);
-        break;
-      case S3UiTouchAction::CenterMinus:
-        joystickCenterAdjust -= JOYSTICK_CENTER_ADJUST_STEP;
-        markUserActivity();
-        beep(BEEP_FREQ_BUTTON, 30);
-        break;
-      case S3UiTouchAction::CenterPlus:
-        joystickCenterAdjust += JOYSTICK_CENTER_ADJUST_STEP;
-        markUserActivity();
-        beep(BEEP_FREQ_BUTTON, 30);
-        break;
-      case S3UiTouchAction::ResetCalibration:
-        joystickCalibration = {ADC_CENTER, 0, 4095, JOYSTICK_DEADZONE};
-        joystickCenter = ADC_CENTER;
-        saveJoystickCalibration();
-        markUserActivity();
-        transmitterArmed = false;
-        armBrakeHolding = false;
-        joystickValue = 0;
-        beep(BEEP_FREQ_BUTTON, 50);
-        break;
-      case S3UiTouchAction::CloseSettings:
-        settingsMode = false;
-        markUserActivity();
-        transmitterArmed = false;
-        armBrakeHolding = false;
-        joystickValue = 0;
-        beep(BEEP_FREQ_BUTTON, 50);
-        break;
-      case S3UiTouchAction::PageChanged:
-        markUserActivity();
-        beep(BEEP_FREQ_BUTTON, 30);
-        break;
-      case S3UiTouchAction::None:
-      default:
-        break;
-    }
+    handleS3TouchAction(s3_ui_set_touch(true, x, y));
     return;
   }
   data->state = LV_INDEV_STATE_RELEASED;
-  s3_ui_set_touch(false, 0, 0);
+  handleS3TouchAction(s3_ui_set_touch(false, 0, 0));
 }
 
 void setupLvgl() {
@@ -1110,7 +1113,7 @@ void loop() {
   updateDiagnosticSerial();
   readInputs();
   if (joystickCenterAdjust != 0) {
-    joystickCenter = clampInt(joystickCenter + joystickCenterAdjust, 1, 4094);
+    joystickCenter = adjustedJoystickCenter(joystickCenter, joystickCenterAdjust);
     joystickCalibration.center = joystickCenter;
     saveJoystickCalibration();
     joystickCenterAdjust = 0;
