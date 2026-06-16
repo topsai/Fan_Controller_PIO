@@ -540,6 +540,34 @@ int16_t drawC3Text(int16_t x, int16_t y, const char *text) {
   return x;
 }
 
+int16_t drawC3HomeText(int16_t x, int16_t y, const char *text) {
+  while (text != nullptr && *text != '\0') {
+    const uint8_t charLen = c3Utf8CharLength((uint8_t)*text);
+    const C3ChineseGlyph *glyph = charLen > 1 ? c3FindChineseGlyph(text) : nullptr;
+    if (glyph != nullptr) {
+      for (uint8_t row = 0; row < C3_CHINESE_GLYPH_HEIGHT; row += 2) {
+        for (uint8_t col = 0; col < C3_CHINESE_GLYPH_WIDTH; col += 2) {
+          const uint8_t byteIndex = row * 2 + col / 8;
+          const uint8_t mask = 0x80 >> (col % 8);
+          if ((glyph->bitmap[byteIndex] & mask) != 0) {
+            display.drawPixel(x + col / 2, y + row / 2, SSD1306_WHITE);
+          }
+        }
+      }
+      x += C3_CHINESE_GLYPH_WIDTH / 2;
+      text += charLen;
+      continue;
+    }
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(x, y);
+    display.write((uint8_t)*text);
+    x += 6;
+    text++;
+  }
+  return x;
+}
+
 
 // ========== CW2015驱动 ==========
 bool cw2015Init() {
@@ -632,35 +660,56 @@ void updateDisplay() {
     return;
   }
 
-  // 第1行：连接状态和信号
+  // 第1行：连接状态和电压
+  int16_t x = drawC3HomeText(0, 0, c3HomeLinkLabel(connected));
   if (connected) {
-    display.printf("%s  BAT:%.2fV\n", c3HomeLinkLabel(true), voltageValue / 100.0);
-  } else {
-    display.println(c3HomeLinkLabel(false));
+    x = drawC3HomeText(x + 4, 0, u8"电");
+    display.setCursor(x, 0);
+    display.printf(":%.2fV", voltageValue / 100.0);
   }
 
-  // 第2行：速度档位和油门/刹车值
+  // 第2行：锁定、档位和油门/刹车值
   const char *direction = c3HomeDirectionLabel(joystickValue);
-  display.printf("%s SPD:%d %s:%4d\n", c3HomeArmLabel(transmitterArmed), speedLevel, direction, abs(joystickValue));
-  if (!transmitterArmed && joystickRawValue <= ARM_BRAKE_THRESHOLD) {
-    display.println("Hold BRK 3s");
+  x = drawC3HomeText(0, 10, c3HomeArmLabel(transmitterArmed));
+  x = drawC3HomeText(x + 4, 10, u8"档");
+  display.setCursor(x, 10);
+  display.printf(":%d", speedLevel);
+  x = drawC3HomeText(52, 10, direction);
+  display.setCursor(x, 10);
+  display.printf(":%4d", abs(joystickValue));
+  const bool showBrakeHoldPrompt = !transmitterArmed && joystickRawValue <= ARM_BRAKE_THRESHOLD;
+  if (showBrakeHoldPrompt) {
+    x = drawC3HomeText(0, 20, u8"刹车");
+    display.setCursor(x, 20);
+    display.print("3s");
   }
 
+  // 第3行：速度
+  const int16_t speedY = showBrakeHoldPrompt ? 26 : 20;
   display.setTextSize(4);
   if (connected) {
-    display.printf("%2d KM\n", speedValue);
+    display.setCursor(0, speedY);
+    display.printf("%2d", speedValue);
+    drawC3Text(52, speedY + 14, u8"公里");
   } else {
-    display.printf("N/A\n");
+    display.setCursor(0, speedY);
+    display.printf("N/A");
   }
 
   display.setTextSize(1);
 
   // 第4行: 电量百分比 + 本地电池电压
-  display.printf("%s:%3d%% BAT:%.2fV\n", c3HomeBatteryLabel(cw2015Available), localBatteryPercent, localBatteryVoltage);
+  x = drawC3HomeText(0, 50, c3HomeBatteryLabel(cw2015Available));
+  display.setCursor(x, 50);
+  display.printf(":%3d%%", localBatteryPercent);
+  x = drawC3HomeText(62, 50, u8"压");
+  display.setCursor(x, 50);
+  display.printf(":%.2fV", localBatteryVoltage);
 
   // 第5行：可视化条
   int barWidth = map(abs(joystickValue), 0, 1000, 0, 60);
-  display.print(direction);
+  x = drawC3HomeText(0, 58, direction);
+  display.setCursor(x, 58);
   display.print(":");
   for (int i = 0; i < barWidth / 6; i++) display.print("=");
   display.println();

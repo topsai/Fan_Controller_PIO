@@ -104,19 +104,19 @@ inline int adjustedJoystickCenter(int center, int delta) {
 }
 
 inline const char *c3HomeLinkLabel(bool connected) {
-  return connected ? "[OK]" : "[LOST]";
+  return connected ? u8"\u8FDE\u63A5" : u8"\u65AD\u7EBF";
 }
 
 inline const char *c3HomeArmLabel(bool armed) {
-  return armed ? "ARM" : "LOCK";
+  return armed ? u8"\u89E3" : u8"\u9501";
 }
 
 inline const char *c3HomeDirectionLabel(int16_t throttle) {
-  return throttle > 0 ? "THR" : "BRK";
+  return throttle > 0 ? u8"\u6CB9" : u8"\u5239";
 }
 
 inline const char *c3HomeBatteryLabel(bool batteryAvailable) {
-  return batteryAvailable ? "SOC" : "N/A";
+  return u8"\u91CF";
 }
 
 inline int16_t safeThrottleForArming(int16_t throttle, bool armed) {
