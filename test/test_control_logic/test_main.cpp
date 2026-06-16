@@ -69,22 +69,25 @@ void test_c3_chinese_font_uses_smaller_render_size() {
   TEST_ASSERT_EQUAL_UINT8(13, C3_CHINESE_RENDER_FONT_SIZE);
 }
 
-void test_c3_home_layout_uses_original_layout_with_chinese_labels() {
-  TEST_ASSERT_EQUAL_STRING(u8"连接", c3HomeLinkLabel(true));
-  TEST_ASSERT_EQUAL_STRING(u8"断线", c3HomeLinkLabel(false));
-  TEST_ASSERT_EQUAL_STRING(u8"解", c3HomeArmLabel(true));
-  TEST_ASSERT_EQUAL_STRING(u8"锁", c3HomeArmLabel(false));
-  TEST_ASSERT_EQUAL_STRING(u8"油", c3HomeDirectionLabel(1));
-  TEST_ASSERT_EQUAL_STRING(u8"刹", c3HomeDirectionLabel(0));
-  TEST_ASSERT_EQUAL_STRING(u8"刹", c3HomeDirectionLabel(-1));
-  TEST_ASSERT_EQUAL_STRING(u8"量", c3HomeBatteryLabel(true));
-  TEST_ASSERT_EQUAL_STRING(u8"量", c3HomeBatteryLabel(false));
+void test_c3_home_layout_uses_original_english_labels() {
+  TEST_ASSERT_EQUAL_STRING("[OK]", c3HomeLinkLabel(true));
+  TEST_ASSERT_EQUAL_STRING("[LOST]", c3HomeLinkLabel(false));
+  TEST_ASSERT_EQUAL_STRING("ARM", c3HomeArmLabel(true));
+  TEST_ASSERT_EQUAL_STRING("LOCK", c3HomeArmLabel(false));
+  TEST_ASSERT_EQUAL_STRING("THR", c3HomeDirectionLabel(1));
+  TEST_ASSERT_EQUAL_STRING("BRK", c3HomeDirectionLabel(0));
+  TEST_ASSERT_EQUAL_STRING("BRK", c3HomeDirectionLabel(-1));
+  TEST_ASSERT_EQUAL_STRING("SOC", c3HomeBatteryLabel(true));
+  TEST_ASSERT_EQUAL_STRING("N/A", c3HomeBatteryLabel(false));
 }
 
-void test_c3_home_layout_uses_readable_chinese_metrics() {
-  TEST_ASSERT_EQUAL_UINT8(16, C3_CHINESE_GLYPH_HEIGHT);
-  TEST_ASSERT_EQUAL_UINT8(3, c3HomeSpeedTextSize());
-  TEST_ASSERT_TRUE(c3HomeUsesReadableChineseLabels());
+void test_c3_home_layout_uses_large_speed_and_framed_throttle_bar() {
+  TEST_ASSERT_EQUAL_UINT8(4, c3HomeSpeedTextSize());
+  TEST_ASSERT_FALSE(c3HomeUsesReadableChineseLabels());
+  TEST_ASSERT_EQUAL_INT(0, c3HomeThrottleBarFillWidth(0, 40));
+  TEST_ASSERT_EQUAL_INT(20, c3HomeThrottleBarFillWidth(500, 40));
+  TEST_ASSERT_EQUAL_INT(40, c3HomeThrottleBarFillWidth(1000, 40));
+  TEST_ASSERT_EQUAL_INT(40, c3HomeThrottleBarFillWidth(-1200, 40));
 }
 
 void test_joystick_calibration_rejects_invalid_persisted_values() {
@@ -597,8 +600,8 @@ void setup() {
   RUN_TEST(test_joystick_center_adjustment_clamps_to_valid_range);
   RUN_TEST(test_c3_chinese_font_contains_required_ui_glyphs);
   RUN_TEST(test_c3_chinese_font_uses_smaller_render_size);
-  RUN_TEST(test_c3_home_layout_uses_original_layout_with_chinese_labels);
-  RUN_TEST(test_c3_home_layout_uses_readable_chinese_metrics);
+  RUN_TEST(test_c3_home_layout_uses_original_english_labels);
+  RUN_TEST(test_c3_home_layout_uses_large_speed_and_framed_throttle_bar);
   RUN_TEST(test_joystick_calibration_rejects_invalid_persisted_values);
   RUN_TEST(test_joystick_calibrated_mapping_uses_persisted_range);
   RUN_TEST(test_transmitter_safety_forces_zero_until_armed);

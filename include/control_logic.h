@@ -104,27 +104,33 @@ inline int adjustedJoystickCenter(int center, int delta) {
 }
 
 inline const char *c3HomeLinkLabel(bool connected) {
-  return connected ? u8"\u8FDE\u63A5" : u8"\u65AD\u7EBF";
+  return connected ? "[OK]" : "[LOST]";
 }
 
 inline const char *c3HomeArmLabel(bool armed) {
-  return armed ? u8"\u89E3" : u8"\u9501";
+  return armed ? "ARM" : "LOCK";
 }
 
 inline const char *c3HomeDirectionLabel(int16_t throttle) {
-  return throttle > 0 ? u8"\u6CB9" : u8"\u5239";
+  return throttle > 0 ? "THR" : "BRK";
 }
 
 inline const char *c3HomeBatteryLabel(bool batteryAvailable) {
-  return u8"\u91CF";
+  return batteryAvailable ? "SOC" : "N/A";
 }
 
 inline uint8_t c3HomeSpeedTextSize() {
-  return 3;
+  return 4;
 }
 
 inline bool c3HomeUsesReadableChineseLabels() {
-  return true;
+  return false;
+}
+
+inline int c3HomeThrottleBarFillWidth(int16_t throttle, int maxWidth) {
+  const int safeMaxWidth = maxWidth < 0 ? 0 : maxWidth;
+  const int magnitude = throttle < 0 ? -(int)throttle : (int)throttle;
+  return (int)mapLong(clampInt(magnitude, 0, 1000), 0, 1000, 0, safeMaxWidth);
 }
 
 inline int16_t safeThrottleForArming(int16_t throttle, bool armed) {

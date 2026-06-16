@@ -632,53 +632,42 @@ void updateDisplay() {
     return;
   }
 
-  // 第1行：连接状态和电压
-  int16_t x = drawC3Text(0, 0, c3HomeLinkLabel(connected));
+  // 第1行：连接状态和信号
   if (connected) {
-    x = drawC3Text(x + 2, 0, u8"压");
-    display.setCursor(x, 0);
-    display.printf(":%.2fV", voltageValue / 100.0);
+    display.printf("%s  BAT:%.2fV\n", c3HomeLinkLabel(true), voltageValue / 100.0);
+  } else {
+    display.println(c3HomeLinkLabel(false));
   }
 
-  // 第2行：锁定、档位和油门/刹车值
+  // 第2行：速度档位和油门/刹车值
   const char *direction = c3HomeDirectionLabel(joystickValue);
-  x = drawC3Text(0, 16, c3HomeArmLabel(transmitterArmed));
-  x = drawC3Text(x + 2, 16, u8"档");
-  display.setCursor(x, 20);
-  display.printf(":%d", speedLevel);
-  x = drawC3Text(58, 16, direction);
-  display.setCursor(x, 20);
-  display.printf(":%4d", abs(joystickValue));
+  display.printf("%s SPD:%d %s:%4d\n", c3HomeArmLabel(transmitterArmed), speedLevel, direction, abs(joystickValue));
+  if (!transmitterArmed && joystickRawValue <= ARM_BRAKE_THRESHOLD) {
+    display.println("Hold BRK 3s");
+  }
 
   // 第3行：速度
-  const int16_t speedY = 34;
   display.setTextSize(c3HomeSpeedTextSize());
   if (connected) {
-    display.setCursor(0, speedY);
-    display.printf("%2d", speedValue);
-    drawC3Text(42, 38, u8"公里");
+    display.printf("%2d KM\n", speedValue);
   } else {
-    display.setCursor(0, speedY);
-    display.printf("N/A");
+    display.printf("N/A\n");
   }
 
   display.setTextSize(1);
 
   // 第4行: 电量百分比 + 本地电池电压
-  x = drawC3Text(84, 32, c3HomeBatteryLabel(cw2015Available));
-  display.setCursor(x, 36);
-  display.printf(":%3d%%", localBatteryPercent);
-  x = drawC3Text(84, 48, u8"压");
-  display.setCursor(x, 52);
-  display.printf(":%.2fV", localBatteryVoltage);
+  display.printf("%s:%3d%% BAT:%.2fV\n", c3HomeBatteryLabel(cw2015Available), localBatteryPercent, localBatteryVoltage);
 
-  // 第5行：可视化条
-  int barWidth = map(abs(joystickValue), 0, 1000, 0, 60);
-  x = drawC3Text(0, 50, direction);
-  display.setCursor(x, 54);
-  display.print(":");
-  for (int i = 0; i < barWidth / 10; i++) display.print("=");
-  display.println();
+  // 第5行：带框油门/刹车进度条
+  display.setCursor(0, 56);
+  display.print(direction);
+  const int barX = 26;
+  const int barY = 55;
+  const int barW = 98;
+  const int barH = 8;
+  display.drawRect(barX, barY, barW, barH, SSD1306_WHITE);
+  display.fillRect(barX + 2, barY + 2, c3HomeThrottleBarFillWidth(joystickValue, barW - 4), barH - 4, SSD1306_WHITE);
 
   display.display();
 }
