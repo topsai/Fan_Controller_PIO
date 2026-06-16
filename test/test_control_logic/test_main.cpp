@@ -66,7 +66,7 @@ void test_c3_chinese_font_contains_required_ui_glyphs() {
 }
 
 void test_c3_chinese_font_uses_smaller_render_size() {
-  TEST_ASSERT_EQUAL_UINT8(14, C3_CHINESE_RENDER_FONT_SIZE);
+  TEST_ASSERT_EQUAL_UINT8(13, C3_CHINESE_RENDER_FONT_SIZE);
 }
 
 void test_joystick_calibration_rejects_invalid_persisted_values() {
