@@ -103,6 +103,16 @@ inline int adjustedJoystickCenter(int center, int delta) {
   return clampInt(center + delta, 1, 4094);
 }
 
+inline int joystickNeutralRangeMin(int center, int deadzone) {
+  const int safeDeadzone = deadzone < 0 ? -deadzone : deadzone;
+  return clampInt(center - safeDeadzone, 1, 4094);
+}
+
+inline int joystickNeutralRangeMax(int center, int deadzone) {
+  const int safeDeadzone = deadzone < 0 ? -deadzone : deadzone;
+  return clampInt(center + safeDeadzone, 1, 4094);
+}
+
 inline const char *c3HomeLinkLabel(bool connected) {
   return connected ? "[OK]" : "[LOST]";
 }

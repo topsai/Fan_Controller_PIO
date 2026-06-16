@@ -204,7 +204,10 @@ void calibrateJoystickCenter() {
   preferences.begin(SETTINGS_NAMESPACE, false);
   preferences.putInt(JOYSTICK_CENTER_KEY, joystickCenter);
   preferences.end();
-  Serial.printf("摇杆中位校准完成: %d\n", joystickCenter);
+  Serial.printf("摇杆中位范围校准完成: %d-%d (center=%d)\n",
+                joystickNeutralRangeMin(joystickCenter, JOYSTICK_DEADZONE),
+                joystickNeutralRangeMax(joystickCenter, JOYSTICK_DEADZONE),
+                joystickCenter);
 }
 
 bool loadJoystickCenter() {
@@ -215,7 +218,10 @@ bool loadJoystickCenter() {
     return false;
   }
   joystickCenter = storedCenter;
-  Serial.printf("摇杆中位已加载: %d\n", joystickCenter);
+  Serial.printf("摇杆中位范围已加载: %d-%d (center=%d)\n",
+                joystickNeutralRangeMin(joystickCenter, JOYSTICK_DEADZONE),
+                joystickNeutralRangeMax(joystickCenter, JOYSTICK_DEADZONE),
+                joystickCenter);
   return true;
 }
 
@@ -618,9 +624,11 @@ void updateDisplay() {
     display.drawRoundRect(0, 0, OLED_WIDTH, OLED_HEIGHT, 4, SSD1306_WHITE);
     drawC3Text(4, 0, u8"设置");
     display.setTextColor(SSD1306_WHITE);
-    int16_t x = drawC3Text(4, 16, u8"中心");
+    int16_t x = drawC3Text(4, 16, u8"中位");
     display.setCursor(x + 2, 20);
-    display.printf("%4d", joystickCenter);
+    display.printf("%4d-%4d",
+                   joystickNeutralRangeMin(joystickCenter, JOYSTICK_DEADZONE),
+                   joystickNeutralRangeMax(joystickCenter, JOYSTICK_DEADZONE));
     x = drawC3Text(4, 32, u8"当前");
     display.setCursor(x + 2, 36);
     display.printf("%4d", joystickAdcRaw);

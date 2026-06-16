@@ -56,6 +56,13 @@ void test_joystick_center_adjustment_clamps_to_valid_range() {
   TEST_ASSERT_EQUAL_INT(4094, adjustedJoystickCenter(4090, 10));
 }
 
+void test_joystick_neutral_range_uses_center_and_deadzone() {
+  TEST_ASSERT_EQUAL_INT(1998, joystickNeutralRangeMin(2048, 50));
+  TEST_ASSERT_EQUAL_INT(2098, joystickNeutralRangeMax(2048, 50));
+  TEST_ASSERT_EQUAL_INT(1, joystickNeutralRangeMin(20, 50));
+  TEST_ASSERT_EQUAL_INT(4094, joystickNeutralRangeMax(4080, 50));
+}
+
 void test_c3_chinese_font_contains_required_ui_glyphs() {
   const char *required = "设置中心当前保存锁定退出连接断线电量速度油门刹车校准取位已解档公里压";
   for (const char *cursor = required; *cursor != '\0';) {
@@ -598,6 +605,7 @@ void setup() {
   RUN_TEST(test_joystick_center_calibration_averages_samples);
   RUN_TEST(test_joystick_center_rejects_invalid_persisted_values);
   RUN_TEST(test_joystick_center_adjustment_clamps_to_valid_range);
+  RUN_TEST(test_joystick_neutral_range_uses_center_and_deadzone);
   RUN_TEST(test_c3_chinese_font_contains_required_ui_glyphs);
   RUN_TEST(test_c3_chinese_font_uses_smaller_render_size);
   RUN_TEST(test_c3_home_layout_uses_original_english_labels);
