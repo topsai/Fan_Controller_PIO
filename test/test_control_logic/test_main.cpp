@@ -3,6 +3,7 @@
 #include "beep_profiles.h"
 #include "protocol.h"
 #include "diagnostic_protocol.h"
+#include "oled_chinese_font.h"
 #include "s3_runtime_config.h"
 #include "s3_ui_bindings.h"
 
@@ -53,6 +54,15 @@ void test_joystick_center_adjustment_clamps_to_valid_range() {
   TEST_ASSERT_EQUAL_INT(2038, adjustedJoystickCenter(2048, -10));
   TEST_ASSERT_EQUAL_INT(1, adjustedJoystickCenter(4, -10));
   TEST_ASSERT_EQUAL_INT(4094, adjustedJoystickCenter(4090, 10));
+}
+
+void test_c3_chinese_font_contains_required_ui_glyphs() {
+  const char *required = "设置中心当前保存锁定退出连接断线电量速度油门刹车校准取位已";
+  for (const char *cursor = required; *cursor != '\0';) {
+    const C3ChineseGlyph *glyph = c3FindChineseGlyph(cursor);
+    TEST_ASSERT_NOT_NULL(glyph);
+    cursor += c3Utf8CharLength((uint8_t)*cursor);
+  }
 }
 
 void test_joystick_calibration_rejects_invalid_persisted_values() {
@@ -563,6 +573,7 @@ void setup() {
   RUN_TEST(test_joystick_center_calibration_averages_samples);
   RUN_TEST(test_joystick_center_rejects_invalid_persisted_values);
   RUN_TEST(test_joystick_center_adjustment_clamps_to_valid_range);
+  RUN_TEST(test_c3_chinese_font_contains_required_ui_glyphs);
   RUN_TEST(test_joystick_calibration_rejects_invalid_persisted_values);
   RUN_TEST(test_joystick_calibrated_mapping_uses_persisted_range);
   RUN_TEST(test_transmitter_safety_forces_zero_until_armed);

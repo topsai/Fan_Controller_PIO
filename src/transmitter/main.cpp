@@ -19,6 +19,7 @@
 #include "beep_profiles.h"
 #include "control_logic.h"
 #include "diagnostic_protocol.h"
+#include "oled_chinese_font.h"
 #include "protocol.h"
 
 // ========== 引脚定义 ==========
@@ -131,6 +132,7 @@ volatile uint8_t buttonState = 0;    // 按钮状态
 volatile bool button1Pressed = false;
 volatile bool button2Pressed = false;
 int joystickCenter = ADC_CENTER;
+int joystickAdcRaw = ADC_CENTER;
 bool transmitterArmed = false;
 bool settingsMode = false;
 bool joystickCalibrateRequested = false;
@@ -287,6 +289,7 @@ void setupTimer() {
 // ========== 输入读取函数 ==========
 void readJoystick() {
   int raw = analogRead(JOYSTICK_PIN);
+  joystickAdcRaw = raw;
   const int16_t targetThrottle = joystickToThrottle(raw, joystickCenter, JOYSTICK_DEADZONE);
   joystickRawValue = targetThrottle;
   if (!settingsMode && !transmitterArmed &&
@@ -517,6 +520,26 @@ void checkConnection() {
   }
 }
 
+int16_t drawC3Text(int16_t x, int16_t y, const char *text) {
+  while (text != nullptr && *text != '\0') {
+    const uint8_t charLen = c3Utf8CharLength((uint8_t)*text);
+    const C3ChineseGlyph *glyph = charLen > 1 ? c3FindChineseGlyph(text) : nullptr;
+    if (glyph != nullptr) {
+      display.drawBitmap(x, y, glyph->bitmap, C3_CHINESE_GLYPH_WIDTH, C3_CHINESE_GLYPH_HEIGHT, SSD1306_WHITE);
+      x += C3_CHINESE_GLYPH_WIDTH;
+      text += charLen;
+      continue;
+    }
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(x, y + 4);
+    display.write((uint8_t)*text);
+    x += 6;
+    text++;
+  }
+  return x;
+}
+
 
 // ========== CW2015驱动 ==========
 bool cw2015Init() {
@@ -593,59 +616,70 @@ void updateDisplay() {
 
   if (settingsMode) {
     display.drawRoundRect(0, 0, OLED_WIDTH, OLED_HEIGHT, 4, SSD1306_WHITE);
-    display.fillRect(0, 0, OLED_WIDTH, 12, SSD1306_WHITE);
-    display.setTextColor(SSD1306_BLACK);
-    display.setCursor(4, 2);
-    display.print("SETTINGS");
+    drawC3Text(4, 0, u8"设置");
     display.setTextColor(SSD1306_WHITE);
-    display.setCursor(4, 16);
-    display.printf("Center %4d", joystickCenter);
-    display.setCursor(4, 28);
-    display.printf("Raw %4d Out %4d", joystickRawValue, joystickValue);
-    display.setCursor(4, 42);
-    display.print("B2 SetMid B1 Exit");
-    display.setCursor(4, 54);
-    display.print("Current ADC saved");
+    int16_t x = drawC3Text(4, 16, u8"中心");
+    display.setCursor(x + 2, 20);
+    display.printf("%4d", joystickCenter);
+    x = drawC3Text(4, 32, u8"当前");
+    display.setCursor(x + 2, 36);
+    display.printf("%4d", joystickAdcRaw);
+    x = drawC3Text(4, 48, "B2");
+    x = drawC3Text(x + 2, 48, u8"取中位");
+    x = drawC3Text(x + 8, 48, "B1");
+    drawC3Text(x + 2, 48, u8"退出");
     display.display();
     return;
   }
 
   // 第1行：连接状态和信号
   if (connected) {
-    display.printf("[OK]  BAT:%.2fV\n", voltageValue / 100.0);
+    int16_t x = drawC3Text(0, 0, u8"连接");
+    display.setCursor(x + 2, 4);
+    display.printf("%.1fV", voltageValue / 100.0);
   } else {
-    display.println("[LOST]");
+    drawC3Text(0, 0, u8"断线");
   }
 
   // 第2行：速度档位和电压
   // display.printf("SPD:%d\n", speedLevel);
 
   // 第3行：油门/刹车值
-  const char *direction = joystickValue > 0 ? "THR" : "BRK";
+  const bool throttleForward = joystickValue > 0;
+  const char *direction = throttleForward ? "THR" : "BRK";
   // display.printf("%s:%4d  BTN:%02X\n", direction, abs(joystickValue), buttonState);
-  display.printf("%s SPD:%d %s:%4d\n", transmitterArmed ? "ARM" : "LOCK", speedLevel, direction, abs(joystickValue));
+  int16_t x = drawC3Text(0, 16, transmitterArmed ? u8"已连接" : u8"锁定");
+  display.setCursor(x + 2, 20);
+  display.printf("L%d", speedLevel);
+  x = drawC3Text(64, 16, throttleForward ? u8"油门" : u8"刹车");
+  display.setCursor(x + 2, 20);
+  display.printf("%4d", abs(joystickValue));
   if (!transmitterArmed && joystickRawValue <= ARM_BRAKE_THRESHOLD) {
-    display.println("Hold BRK 3s");
+    display.setCursor(0, 28);
+    display.print("BRK 3s");
   }
-  display.setTextSize(4);
+  display.setTextSize(3);
   // display.println("30 KM");
   if (connected) {
-    display.printf("%2d KM\n", speedValue);
+    display.setCursor(0, 34);
+    display.printf("%2d", speedValue);
+    drawC3Text(44, 40, u8"速度");
   } else {
-    display.printf("N/A\n");
+    display.setCursor(0, 34);
+    display.printf("N/A");
   }
 
   display.setTextSize(1);
 
   // 第4行: 电量百分比 + 本地电池电压
-  display.printf("%s:%3d%% BAT:%.2fV\n", cw2015Available ? "SOC" : "N/A", localBatteryPercent, localBatteryVoltage);
+  x = drawC3Text(82, 40, u8"电量");
+  display.setCursor(x + 1, 44);
+  display.printf("%3d%%", localBatteryPercent);
 
   // 第5行：可视化条
   int barWidth = map(abs(joystickValue), 0, 1000, 0, 60);
-  display.print(direction);
-  display.print(":");
-  for (int i = 0; i < barWidth / 6; i++) display.print("=");
-  display.println();
+  display.drawRect(82, 56, 42, 6, SSD1306_WHITE);
+  display.fillRect(84, 58, map(barWidth, 0, 60, 0, 38), 2, SSD1306_WHITE);
 
   display.display();
 }
