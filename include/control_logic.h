@@ -57,6 +57,12 @@ struct JoystickCalibration {
   int deadzone;
 };
 
+struct JoystickNeutralRange {
+  int minRaw;
+  int maxRaw;
+  int center;
+};
+
 inline bool joystickCalibrationIsValid(const JoystickCalibration &calibration) {
   return calibration.minRaw >= 0 &&
          calibration.maxRaw <= 4095 &&
@@ -83,6 +89,29 @@ inline int joystickToThrottleCalibrated(int raw, const JoystickCalibration &cali
   return clampInt((int)mapped, -1000, 1000);
 }
 
+inline bool joystickNeutralRangeIsValid(const JoystickNeutralRange &range) {
+  return range.minRaw >= 1 &&
+         range.maxRaw <= 4094 &&
+         range.minRaw <= range.center &&
+         range.center <= range.maxRaw &&
+         range.minRaw < range.maxRaw;
+}
+
+inline int joystickToThrottleNeutralRange(int raw, int neutralMin, int neutralMax) {
+  const int safeMin = clampInt(neutralMin, 1, 4094);
+  const int safeMax = clampInt(neutralMax, safeMin + 1, 4094);
+  if (raw >= safeMin && raw <= safeMax) {
+    return 0;
+  }
+  long mapped;
+  if (raw > safeMax) {
+    mapped = mapLong(raw, safeMax, 4095, 0, 1000);
+  } else {
+    mapped = mapLong(raw, 0, safeMin, -1000, 0);
+  }
+  return clampInt((int)mapped, -1000, 1000);
+}
+
 inline int calibratedJoystickCenter(const int *samples, size_t sampleCount, int fallbackCenter) {
   if (samples == nullptr || sampleCount == 0) {
     return fallbackCenter;
@@ -93,6 +122,37 @@ inline int calibratedJoystickCenter(const int *samples, size_t sampleCount, int 
     sum += samples[i];
   }
   return (int)((sum + (long)sampleCount / 2) / (long)sampleCount);
+}
+
+inline JoystickNeutralRange calibratedJoystickNeutralRange(
+  const int *returnSamples,
+  size_t sampleCount,
+  int fallbackCenter,
+  int minimumHalfWidth
+) {
+  const int safeCenter = clampInt(fallbackCenter, 1, 4094);
+  const int safeHalfWidth = minimumHalfWidth < 0 ? -minimumHalfWidth : minimumHalfWidth;
+  if (returnSamples == nullptr || sampleCount == 0) {
+    return {
+      clampInt(safeCenter - safeHalfWidth, 1, 4094),
+      clampInt(safeCenter + safeHalfWidth, 1, 4094),
+      safeCenter
+    };
+  }
+
+  int minRaw = 4095;
+  int maxRaw = 0;
+  long sum = 0;
+  for (size_t i = 0; i < sampleCount; i++) {
+    const int raw = clampInt(returnSamples[i], 1, 4094);
+    if (raw < minRaw) minRaw = raw;
+    if (raw > maxRaw) maxRaw = raw;
+    sum += raw;
+  }
+  const int center = (int)((sum + (long)sampleCount / 2) / (long)sampleCount);
+  minRaw = minRaw < center - safeHalfWidth ? minRaw : center - safeHalfWidth;
+  maxRaw = maxRaw > center + safeHalfWidth ? maxRaw : center + safeHalfWidth;
+  return {clampInt(minRaw, 1, 4094), clampInt(maxRaw, 1, 4094), clampInt(center, 1, 4094)};
 }
 
 inline bool joystickCenterIsValid(int center) {

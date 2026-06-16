@@ -53,6 +53,8 @@
 #define TAKEOVER_REQUEST_WINDOW_MS 1000
 #define SETTINGS_NAMESPACE "tx_cfg"
 #define JOYSTICK_CENTER_KEY "joy_center"
+#define JOYSTICK_NEUTRAL_MIN_KEY "joy_n_min"
+#define JOYSTICK_NEUTRAL_MAX_KEY "joy_n_max"
 
 // ========== CW2015寄存器 ==========
 #define CW2015_ADDR 0x62         // CW2015 I2C地址 [^43^]
@@ -108,6 +110,7 @@ typedef struct {
 void beep(uint16_t frequency_hz, uint16_t duration_ms);
 void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status);
 void onDataRecv(const uint8_t *mac, const uint8_t *data, int len);
+int16_t drawC3Text(int16_t x, int16_t y, const char *text);
 
 // ========== 全局变量 ==========
 uint8_t receiverMac[] = RECEIVER_MAC;
@@ -132,6 +135,8 @@ volatile uint8_t buttonState = 0;    // 按钮状态
 volatile bool button1Pressed = false;
 volatile bool button2Pressed = false;
 int joystickCenter = ADC_CENTER;
+int joystickNeutralMin = ADC_CENTER - JOYSTICK_DEADZONE;
+int joystickNeutralMax = ADC_CENTER + JOYSTICK_DEADZONE;
 int joystickAdcRaw = ADC_CENTER;
 bool transmitterArmed = false;
 bool settingsMode = false;
@@ -193,34 +198,109 @@ void setupPins() {
   Serial.println("引脚初始化完成");
 }
 
-void calibrateJoystickCenter() {
-  const size_t sampleCount = 64;
+void showJoystickCalibrationStep(const char *line1, const char *line2) {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.drawRoundRect(0, 0, OLED_WIDTH, OLED_HEIGHT, 4, SSD1306_WHITE);
+  drawC3Text(4, 0, u8"校准");
+  display.setCursor(4, 20);
+  display.print(line1);
+  display.setCursor(4, 38);
+  display.print(line2);
+  display.display();
+}
+
+int readStableJoystickAdc() {
+  const size_t sampleCount = 32;
   int samples[sampleCount];
   for (size_t i = 0; i < sampleCount; i++) {
     samples[i] = analogRead(JOYSTICK_PIN);
-    delay(2);
+    delay(3);
   }
-  joystickCenter = calibratedJoystickCenter(samples, sampleCount, ADC_CENTER);
+  return calibratedJoystickCenter(samples, sampleCount, ADC_CENTER);
+}
+
+void waitForJoystickAbove(int threshold) {
+  while (analogRead(JOYSTICK_PIN) < threshold) {
+    delay(10);
+  }
+}
+
+void waitForJoystickBelow(int threshold) {
+  while (analogRead(JOYSTICK_PIN) > threshold) {
+    delay(10);
+  }
+}
+
+int waitForJoystickReturnAndSample() {
+  while (true) {
+    const int raw = analogRead(JOYSTICK_PIN);
+    if (raw >= 1000 && raw <= 3100) {
+      delay(250);
+      return readStableJoystickAdc();
+    }
+    delay(10);
+  }
+}
+
+void saveJoystickNeutralRange(const JoystickNeutralRange &range) {
+  joystickCenter = range.center;
+  joystickNeutralMin = range.minRaw;
+  joystickNeutralMax = range.maxRaw;
   preferences.begin(SETTINGS_NAMESPACE, false);
   preferences.putInt(JOYSTICK_CENTER_KEY, joystickCenter);
+  preferences.putInt(JOYSTICK_NEUTRAL_MIN_KEY, joystickNeutralMin);
+  preferences.putInt(JOYSTICK_NEUTRAL_MAX_KEY, joystickNeutralMax);
   preferences.end();
+}
+
+void calibrateJoystickCenter() {
+  const size_t returnSampleCount = 4;
+  int returnSamples[returnSampleCount];
+  size_t sampleIndex = 0;
+
+  for (int round = 0; round < 2; round++) {
+    showJoystickCalibrationStep("Push THR full", "then release center");
+    waitForJoystickAbove(3600);
+    returnSamples[sampleIndex++] = waitForJoystickReturnAndSample();
+    beep(BEEP_FREQ_BUTTON, 60);
+
+    showJoystickCalibrationStep("Pull BRK full", "then release center");
+    waitForJoystickBelow(500);
+    returnSamples[sampleIndex++] = waitForJoystickReturnAndSample();
+    beep(BEEP_FREQ_BUTTON, 60);
+  }
+
+  const JoystickNeutralRange range = calibratedJoystickNeutralRange(returnSamples, returnSampleCount, joystickCenter, 10);
+  saveJoystickNeutralRange(range);
   Serial.printf("摇杆中位范围校准完成: %d-%d (center=%d)\n",
-                joystickNeutralRangeMin(joystickCenter, JOYSTICK_DEADZONE),
-                joystickNeutralRangeMax(joystickCenter, JOYSTICK_DEADZONE),
+                joystickNeutralMin,
+                joystickNeutralMax,
                 joystickCenter);
 }
 
 bool loadJoystickCenter() {
   preferences.begin(SETTINGS_NAMESPACE, true);
   const int storedCenter = preferences.getInt(JOYSTICK_CENTER_KEY, -1);
+  const int storedNeutralMin = preferences.getInt(JOYSTICK_NEUTRAL_MIN_KEY, -1);
+  const int storedNeutralMax = preferences.getInt(JOYSTICK_NEUTRAL_MAX_KEY, -1);
   preferences.end();
   if (!joystickCenterIsValid(storedCenter)) {
     return false;
   }
   joystickCenter = storedCenter;
+  const JoystickNeutralRange storedRange = {storedNeutralMin, storedNeutralMax, storedCenter};
+  if (joystickNeutralRangeIsValid(storedRange)) {
+    joystickNeutralMin = storedNeutralMin;
+    joystickNeutralMax = storedNeutralMax;
+  } else {
+    joystickNeutralMin = joystickNeutralRangeMin(joystickCenter, JOYSTICK_DEADZONE);
+    joystickNeutralMax = joystickNeutralRangeMax(joystickCenter, JOYSTICK_DEADZONE);
+  }
   Serial.printf("摇杆中位范围已加载: %d-%d (center=%d)\n",
-                joystickNeutralRangeMin(joystickCenter, JOYSTICK_DEADZONE),
-                joystickNeutralRangeMax(joystickCenter, JOYSTICK_DEADZONE),
+                joystickNeutralMin,
+                joystickNeutralMax,
                 joystickCenter);
   return true;
 }
@@ -296,7 +376,7 @@ void setupTimer() {
 void readJoystick() {
   int raw = analogRead(JOYSTICK_PIN);
   joystickAdcRaw = raw;
-  const int16_t targetThrottle = joystickToThrottle(raw, joystickCenter, JOYSTICK_DEADZONE);
+  const int16_t targetThrottle = joystickToThrottleNeutralRange(raw, joystickNeutralMin, joystickNeutralMax);
   joystickRawValue = targetThrottle;
   if (!settingsMode && !transmitterArmed &&
       shouldArmByBrakeHold(targetThrottle, millis(), armBrakeHoldStartMs, armBrakeHolding,
@@ -627,8 +707,8 @@ void updateDisplay() {
     int16_t x = drawC3Text(4, 16, u8"中位");
     display.setCursor(x + 2, 20);
     display.printf("%4d-%4d",
-                   joystickNeutralRangeMin(joystickCenter, JOYSTICK_DEADZONE),
-                   joystickNeutralRangeMax(joystickCenter, JOYSTICK_DEADZONE));
+                   joystickNeutralMin,
+                   joystickNeutralMax);
     x = drawC3Text(4, 32, u8"当前");
     display.setCursor(x + 2, 36);
     display.printf("%4d", joystickAdcRaw);
@@ -691,7 +771,11 @@ void setup() {
 
   setupPins();
   if (!loadJoystickCenter()) {
-    calibrateJoystickCenter();
+    saveJoystickNeutralRange({ADC_CENTER - JOYSTICK_DEADZONE, ADC_CENTER + JOYSTICK_DEADZONE, ADC_CENTER});
+    Serial.printf("摇杆使用默认中位范围: %d-%d (center=%d)\n",
+                  joystickNeutralMin,
+                  joystickNeutralMax,
+                  joystickCenter);
   }
   setupOLED();
   cw2015Available = cw2015Init();
