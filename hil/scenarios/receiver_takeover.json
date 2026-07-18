@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "name": "receiver takeover",
+  "steps": [
+    {"command": "RESET"},
+    {"command": "REMOTE CONTROL c3 0 1 0 0"},
+    {"command": "REMOTE CONTROL c3 0 1 0 0"},
+    {"command": "REMOTE CONTROL c3 0 1 0 0"},
+    {"command": "REMOTE CONTROL s3 200 1 0 0"},
+    {"command": "STATUS", "expect": {"active_controller": "c3"}},
+    {"command": "REMOTE CONTROL s3 0 1 0 1"},
+    {"command": "REMOTE CONTROL s3 0 1 0 1"},
+    {"command": "REMOTE CONTROL s3 0 1 0 1"},
+    {"command": "STATUS", "expect": {"active_controller": "s3", "connected": true}}
+  ]
+}

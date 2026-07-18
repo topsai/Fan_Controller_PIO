@@ -16,6 +16,11 @@
 #include "control_logic.h"
 #include "diagnostic_protocol.h"
 #include "protocol.h"
+#include "receiver_frame.h"
+#ifdef FAN_CONTROLLER_HIL
+#include "hil_protocol.h"
+#include "hil_safety.h"
+#endif
 // ========== 引脚定义 ==========
 #define PWM_OUT_1 4  //SERVO
 #define LED_STATUS 2
@@ -50,27 +55,6 @@ uint8_t s3TransmitterMac[] = { 0x48, 0xCA, 0x43, 0x9A, 0xA9, 0xB0 };
 
 // ========== 数据结构 ==========
 #pragma pack(push, 1)
-
-typedef struct {
-  uint8_t head;
-  uint8_t type;
-  uint8_t version;
-  uint16_t sequence;
-  int16_t throttle;
-  uint8_t speedLevel;
-  uint8_t buttons;
-  uint8_t flags;
-  uint8_t crc;
-} ControlPacket;
-
-typedef struct {
-  uint8_t head;
-  uint8_t type;
-  int16_t throttle;
-  uint8_t speedLevel;
-  uint8_t buttons;
-  uint8_t checksum;
-} LegacyControlPacket;
 
 typedef struct {
   uint8_t head;
@@ -147,6 +131,21 @@ bool remoteHornActive = false;
 bool remoteHornTimeoutReported = false;
 volatile bool connectionBeepPending = false;
 uint32_t buzzerHoldUntil = 0;
+
+#ifdef FAN_CONTROLLER_HIL
+static constexpr uint32_t HIL_OUTPUT_WATCHDOG_MS = 10000;
+HilOutputGate hilOutputGate = hilInitialOutputGate((PWM_MIN + PWM_MAX) / 2);
+char hilLastError[24] = "ok";
+uint32_t hilLastSequence = 0;
+uint8_t hilLastFrame[sizeof(ReceiverControlFrameV2)] = {};
+size_t hilLastFrameLength = 0;
+uint8_t hilLastFrameMac[6] = {};
+ReceiverFrameResult hilLastFrameResult = RECEIVER_FRAME_BAD_LENGTH;
+enum HilVescMode : uint8_t { HIL_VESC_PHYSICAL, HIL_VESC_VALUE, HIL_VESC_FAULT };
+HilVescMode hilVescMode = HIL_VESC_PHYSICAL;
+int32_t hilVescVoltageX100 = 0;
+int32_t hilVescRpm = 0;
+#endif
 
 const int pwmChannels[] = { 0, 1, 2, 3 };
 
@@ -262,6 +261,29 @@ void applyControlPacketFromSource(
   digitalWrite(LED_STATUS, !digitalRead(LED_STATUS));
 }
 
+ReceiverFrameResult processControlFrame(const uint8_t *mac, const uint8_t *data, size_t len) {
+  if (!isBoundTransmitter(mac)) {
+    diagnosticIgnoredPackets++;
+    return RECEIVER_FRAME_BAD_HEADER;
+  }
+  ReceiverDecodedControl decoded = {};
+  const ReceiverFrameResult result = receiverDecodeControlFrame(data, len, decoded);
+  if (result != RECEIVER_FRAME_OK) {
+    protocolFault = true;
+    diagnosticFaultCount++;
+    return result;
+  }
+  applyControlPacketFromSource(mac,
+                               decoded.throttle,
+                               decoded.speedLevel,
+                               decoded.buttons,
+                               decoded.flags,
+                               decoded.legacy,
+                               decoded.hasSequence,
+                               decoded.sequence);
+  return RECEIVER_FRAME_OK;
+}
+
 // ========== 硬件定时器中断 ==========
 void IRAM_ATTR onTimer() {
   portENTER_CRITICAL_ISR(&timerMux);
@@ -272,6 +294,14 @@ void IRAM_ATTR onTimer() {
 }
 
 void beep(uint16_t frequency_hz, uint16_t duration_ms) {
+#ifdef FAN_CONTROLLER_HIL
+  hilOutputGate.expectedBuzzer = true;
+  if (!hilActualBuzzer(hilOutputGate)) {
+    noTone(BUZZER_PIN);
+    buzzerHoldUntil = millis() + duration_ms;
+    return;
+  }
+#endif
   tone(BUZZER_PIN, frequency_hz, duration_ms);  // 自动停止
   buzzerHoldUntil = millis() + duration_ms;
 }
@@ -285,6 +315,9 @@ void alarmBeep() {
 }
 
 void stopBuzzer() {
+#ifdef FAN_CONTROLLER_HIL
+  hilOutputGate.expectedBuzzer = false;
+#endif
   noTone(BUZZER_PIN);
 }
 
@@ -355,59 +388,7 @@ void setupESPNOW() {
     esp_wifi_sta_get_ap_info(&ap_info);
     lastRssi = ap_info.rssi;  // 这个方法更可靠
 
-    int16_t receivedThrottle = 0;
-    uint8_t receivedSpeedLevel = 1;
-    uint8_t receivedButtons = 0;
-    uint8_t receivedFlags = 0;
-    bool legacyPacket = false;
-    bool hasSequence = false;
-    uint16_t receivedSequence = 0;
-
-    if (len == sizeof(ControlPacket)) {
-      ControlPacket *pkt = (ControlPacket *)data;
-      if (pkt->head != CONTROL_PACKET_HEAD || pkt->type != CONTROL_PACKET_TYPE || pkt->version != CONTROL_PROTOCOL_VERSION) {
-        protocolFault = true;
-        diagnosticFaultCount++;
-        return;
-      }
-
-      if (protocolCrc8((const uint8_t *)pkt, sizeof(ControlPacket) - 1) != pkt->crc) {
-        protocolFault = true;
-        diagnosticFaultCount++;
-        return;
-      }
-      hasSequence = true;
-      receivedSequence = pkt->sequence;
-      receivedThrottle = pkt->throttle;
-      receivedSpeedLevel = pkt->speedLevel;
-      receivedButtons = pkt->buttons;
-      receivedFlags = pkt->flags;
-    } else if (len == sizeof(LegacyControlPacket)) {
-      LegacyControlPacket *pkt = (LegacyControlPacket *)data;
-      if (pkt->head != CONTROL_PACKET_HEAD || pkt->type != CONTROL_PACKET_TYPE ||
-          !protocolLegacyChecksumIsValid((const uint8_t *)pkt, sizeof(LegacyControlPacket))) {
-        protocolFault = true;
-        diagnosticFaultCount++;
-        return;
-      }
-      legacyPacket = true;
-      receivedThrottle = pkt->throttle;
-      receivedSpeedLevel = pkt->speedLevel;
-      receivedButtons = pkt->buttons;
-    } else {
-      protocolFault = true;
-      diagnosticFaultCount++;
-      return;
-    }
-
-    applyControlPacketFromSource(mac,
-                                 receivedThrottle,
-                                 receivedSpeedLevel,
-                                 receivedButtons,
-                                 receivedFlags,
-                                 legacyPacket,
-                                 hasSequence,
-                                 receivedSequence);
+    processControlFrame(mac, data, static_cast<size_t>(len));
     lastRssi = WiFi.RSSI();
   });
 
@@ -454,6 +435,10 @@ void updateMotors() {
   int pwmValue = pwmDutyForThrottle(throttle, speedLevel, PWM_MIN, PWM_MAX);
 
   // 仅输出到 GPIO4 (VESC servo)
+#ifdef FAN_CONTROLLER_HIL
+  hilSetExpectedPwm(hilOutputGate, pwmValue);
+  pwmValue = hilActualPwm(hilOutputGate);
+#endif
   ledcWrite(pwmChannels[0], pwmValue);
   lastPwmValue = pwmValue;
   // motorPWMValues[0] = map(pwmValue, PWM_MIN, PWM_MAX, 0, 255);
@@ -622,6 +607,7 @@ void handleDiagnosticCommand(const String &line) {
     printDiagnosticStatus();
     return;
   }
+#ifdef FAN_CONTROLLER_HIL
   if (line.startsWith("DIAG SIMCTRL ")) {
     int throttleValue = 0;
     int speedValue = 1;
@@ -673,6 +659,7 @@ void handleDiagnosticCommand(const String &line) {
     Serial.println("DIAG OK simctrlfrom");
     return;
   }
+#endif
   if (line.length() > 0) {
     Serial.println("DIAG ERR unknown");
     diagnosticFaultCount++;
@@ -698,6 +685,276 @@ void updateDiagnosticSerial() {
     }
   }
 }
+
+#ifdef FAN_CONTROLLER_HIL
+void sendHilAck(uint32_t sequence, bool ok, const char *error = nullptr) {
+  Serial.printf("{\"type\":\"ack\",\"sequence\":%lu,\"ok\":%s",
+                static_cast<unsigned long>(sequence), ok ? "true" : "false");
+  if (error != nullptr) Serial.printf(",\"error\":\"%s\"", error);
+  Serial.println("}");
+}
+
+bool hilDecodeHex(const char *text, uint8_t *output, size_t capacity, size_t &length) {
+  length = 0;
+  if (text == nullptr) return false;
+  const size_t textLength = strlen(text);
+  if (textLength == 0 || (textLength & 1u) != 0 || textLength / 2 > capacity) return false;
+  for (size_t i = 0; i < textLength; i += 2) {
+    char pair[3] = {text[i], text[i + 1], '\0'};
+    char *end = nullptr;
+    const unsigned long value = strtoul(pair, &end, 16);
+    if (end != pair + 2 || value > 255) return false;
+    output[length++] = static_cast<uint8_t>(value);
+  }
+  return true;
+}
+
+void rememberHilFrame(const uint8_t *mac, const uint8_t *data, size_t length, ReceiverFrameResult result) {
+  memcpy(hilLastFrameMac, mac, sizeof(hilLastFrameMac));
+  hilLastFrameLength = min(length, sizeof(hilLastFrame));
+  memcpy(hilLastFrame, data, hilLastFrameLength);
+  hilLastFrameResult = result;
+}
+
+ReceiverFrameResult injectHilFrame(const uint8_t *mac, const uint8_t *data, size_t length) {
+  const ReceiverFrameResult result = processControlFrame(mac, data, length);
+  rememberHilFrame(mac, data, length, result);
+  return result;
+}
+
+void sendHilStatus(uint32_t sequence) {
+  const int16_t expectedPwm = hilOutputGate.expectedPwm;
+  const int16_t actualPwm = hilActualPwm(hilOutputGate);
+  const bool expectedBuzzer = updateRemoteHorn() || millis() < buzzerHoldUntil;
+  Serial.printf("{\"type\":\"status\",\"sequence\":%lu,\"ok\":true,"
+                "\"firmware\":\"fan-controller-receiver\",\"protocol\":%u,\"role\":\"receiver\","
+                "\"uptime_ms\":%lu,\"last_sequence\":%lu,\"last_result\":\"%s\",",
+                static_cast<unsigned long>(sequence), HIL_PROTOCOL_VERSION,
+                static_cast<unsigned long>(millis()), static_cast<unsigned long>(hilLastSequence), hilLastError);
+  Serial.printf("\"outputs_unlocked\":%s,\"watchdog_remaining_ms\":%lu,"
+                "\"connected\":%s,\"failsafe\":%s,\"protocol_fault\":%s,"
+                "\"active_controller\":\"%s\",\"stable_packets\":%u,",
+                hilOutputGate.unlocked ? "true" : "false",
+                hilOutputGate.unlocked ? static_cast<unsigned long>(HIL_OUTPUT_WATCHDOG_MS - min(static_cast<uint32_t>(millis() - hilOutputGate.lastCommandAt), HIL_OUTPUT_WATCHDOG_MS)) : 0UL,
+                connected ? "true" : "false", failsafeActive ? "true" : "false", protocolFault ? "true" : "false",
+                controllerSource.hasActiveController ? controllerNameForMac(controllerSource.activeMac) : "none",
+                stableControlPacketCount);
+  Serial.printf("\"remote\":{\"frame_length\":%u,\"frame_result\":%u,\"sequence\":%u,"
+                "\"throttle\":%d,\"speed_level\":%u,\"buttons\":%u},",
+                static_cast<unsigned>(hilLastFrameLength), static_cast<unsigned>(hilLastFrameResult),
+                lastControlSequence, throttle, speedLevel, buttons);
+  Serial.printf("\"vesc\":{\"mode\":\"%s\",\"valid\":%s,\"voltage_x100\":%u,\"speed\":%d},",
+                hilVescMode == HIL_VESC_PHYSICAL ? "physical" : (hilVescMode == HIL_VESC_VALUE ? "value" : "fault"),
+                vescTelemetryValid ? "true" : "false", batteryVoltageX100, speed);
+  Serial.printf("\"diagnostics\":{\"received\":%lu,\"lost\":%lu,\"faults\":%lu,\"ignored\":%lu,"
+                "\"failsafes\":%lu,\"max_gap_ms\":%lu},",
+                static_cast<unsigned long>(diagnosticReceivedPackets), static_cast<unsigned long>(diagnosticLostPackets),
+                static_cast<unsigned long>(diagnosticFaultCount), static_cast<unsigned long>(diagnosticIgnoredPackets),
+                static_cast<unsigned long>(diagnosticFailsafeCount), static_cast<unsigned long>(diagnosticMaxPacketGapMs));
+  Serial.printf("\"expected_outputs\":{\"pwm\":%d,\"buzzer\":%s},"
+                "\"actual_outputs\":{\"pwm\":%d,\"buzzer\":%s}}\n",
+                expectedPwm, expectedBuzzer ? "true" : "false", actualPwm,
+                (hilOutputGate.unlocked && expectedBuzzer) ? "true" : "false");
+}
+
+void resetHilReceiverState() {
+  throttle = 0;
+  speedLevel = 1;
+  buttons = 0;
+  connected = false;
+  failsafeActive = true;
+  protocolFault = false;
+  stableControlPacketCount = 0;
+  controllerSource = {};
+  hasControlSequence = false;
+  hasStatusTarget = false;
+  sourceOutputLocked = true;
+  hilOutputGate = hilInitialOutputGate((PWM_MIN + PWM_MAX) / 2);
+  hilLastFrameLength = 0;
+  hilLastFrameResult = RECEIVER_FRAME_BAD_LENGTH;
+  strcpy(hilLastError, "ok");
+  updateMotors();
+  noTone(BUZZER_PIN);
+}
+
+void handleHilCommand(const HilCommand &command) {
+  hilLastSequence = command.sequence;
+  strcpy(hilLastError, "ok");
+  hilOutputGate.lastCommandAt = millis();
+  switch (command.type) {
+    case HIL_COMMAND_PING:
+      sendHilAck(command.sequence, true);
+      return;
+    case HIL_COMMAND_STATUS:
+      sendHilStatus(command.sequence);
+      return;
+    case HIL_COMMAND_OUTPUTS_LOCK:
+      hilSetOutputsUnlocked(hilOutputGate, false, millis());
+      updateMotors();
+      noTone(BUZZER_PIN);
+      sendHilAck(command.sequence, true);
+      return;
+    case HIL_COMMAND_OUTPUTS_UNLOCK:
+      hilSetOutputsUnlocked(hilOutputGate, true, millis());
+      updateMotors();
+      sendHilAck(command.sequence, true);
+      return;
+    case HIL_COMMAND_REMOTE_CONTROL: {
+      const uint8_t *mac = macForControllerName(command.text);
+      if (mac == nullptr || command.values[0] < -1000 || command.values[0] > 1000 ||
+          command.values[1] < 1 || command.values[1] > 3 || command.values[2] < 0 || command.values[2] > 255 ||
+          command.values[3] < 0 || command.values[3] > 255) {
+        sendHilAck(command.sequence, false, "invalid_argument");
+        return;
+      }
+      ReceiverControlFrameV2 frame = {};
+      frame.head = CONTROL_PACKET_HEAD;
+      frame.type = CONTROL_PACKET_TYPE;
+      frame.version = CONTROL_PROTOCOL_VERSION;
+      frame.sequence = static_cast<uint16_t>(command.sequence);
+      frame.throttle = static_cast<int16_t>(command.values[0]);
+      frame.speedLevel = static_cast<uint8_t>(command.values[1]);
+      frame.buttons = static_cast<uint8_t>(command.values[2]);
+      frame.flags = static_cast<uint8_t>(command.values[3]);
+      frame.crc = protocolCrc8(reinterpret_cast<const uint8_t *>(&frame), sizeof(frame) - 1);
+      const ReceiverFrameResult result = injectHilFrame(mac, reinterpret_cast<const uint8_t *>(&frame), sizeof(frame));
+      if (result != RECEIVER_FRAME_OK) {
+        sendHilAck(command.sequence, false, "invalid_argument");
+        return;
+      }
+      sendHilAck(command.sequence, true);
+      return;
+    }
+    case HIL_COMMAND_REMOTE_FRAME: {
+      const uint8_t *mac = macForControllerName(command.text);
+      uint8_t bytes[sizeof(ReceiverControlFrameV2)] = {};
+      size_t length = 0;
+      if (mac == nullptr || !hilDecodeHex(command.data, bytes, sizeof(bytes), length)) {
+        sendHilAck(command.sequence, false, "invalid_argument");
+        return;
+      }
+      const ReceiverFrameResult result = injectHilFrame(mac, bytes, length);
+      if (result != RECEIVER_FRAME_OK) {
+        sendHilAck(command.sequence, false, result == RECEIVER_FRAME_BAD_LENGTH ? "invalid_argument" : "frame_rejected");
+        return;
+      }
+      sendHilAck(command.sequence, true);
+      return;
+    }
+    case HIL_COMMAND_REMOTE_REPEAT:
+      if (command.values[0] < 1 || command.values[0] > 100 || hilLastFrameLength == 0) {
+        sendHilAck(command.sequence, false, "invalid_argument");
+        return;
+      }
+      for (int32_t i = 0; i < command.values[0]; i++) injectHilFrame(hilLastFrameMac, hilLastFrame, hilLastFrameLength);
+      sendHilAck(command.sequence, true);
+      return;
+    case HIL_COMMAND_REMOTE_INVALID: {
+      const uint8_t *sourceMac = macForControllerName(command.text);
+      uint8_t unknownMac[6] = {1, 2, 3, 4, 5, 6};
+      if (sourceMac == nullptr) { sendHilAck(command.sequence, false, "invalid_argument"); return; }
+      ReceiverControlFrameV2 frame = {};
+      frame.head = CONTROL_PACKET_HEAD;
+      frame.type = CONTROL_PACKET_TYPE;
+      frame.version = CONTROL_PROTOCOL_VERSION;
+      frame.sequence = static_cast<uint16_t>(command.sequence);
+      frame.speedLevel = 1;
+      frame.crc = protocolCrc8(reinterpret_cast<const uint8_t *>(&frame), sizeof(frame) - 1);
+      const uint8_t *mac = sourceMac;
+      size_t length = sizeof(frame);
+      if (strcmp(command.data, "crc") == 0) frame.crc ^= 0xFF;
+      else if (strcmp(command.data, "unknown_address") == 0) mac = unknownMac;
+      else if (strcmp(command.data, "unknown_command") == 0) { frame.type = 0x7F; frame.crc = protocolCrc8(reinterpret_cast<const uint8_t *>(&frame), sizeof(frame) - 1); }
+      else if (strcmp(command.data, "truncated") == 0) length -= 2;
+      else if (strcmp(command.data, "stale") == 0) frame.sequence = lastControlSequence;
+      else { sendHilAck(command.sequence, false, "invalid_argument"); return; }
+      injectHilFrame(mac, reinterpret_cast<const uint8_t *>(&frame), length);
+      sendHilAck(command.sequence, true);
+      return;
+    }
+    case HIL_COMMAND_VESC_PHYSICAL:
+      hilVescMode = HIL_VESC_PHYSICAL;
+      sendHilAck(command.sequence, true);
+      return;
+    case HIL_COMMAND_VESC_FAULT:
+      hilVescMode = HIL_VESC_FAULT;
+      vescTelemetryValid = false;
+      sendHilAck(command.sequence, true);
+      return;
+    case HIL_COMMAND_VESC_VALUE:
+      if (command.values[0] < 0 || command.values[0] > 10000) {
+        sendHilAck(command.sequence, false, "invalid_argument");
+        return;
+      }
+      hilVescMode = HIL_VESC_VALUE;
+      hilVescVoltageX100 = command.values[0];
+      hilVescRpm = command.values[1];
+      vescTelemetryValid = true;
+      batteryVoltageX100 = static_cast<uint16_t>(hilVescVoltageX100);
+      speed = static_cast<int16_t>(hilVescRpm * 0.00207f);
+      sendHilAck(command.sequence, true);
+      return;
+    case HIL_COMMAND_RESET:
+      resetHilReceiverState();
+      sendHilAck(command.sequence, true);
+      return;
+    case HIL_COMMAND_REBOOT:
+      hilSetOutputsUnlocked(hilOutputGate, false, millis());
+      updateMotors();
+      noTone(BUZZER_PIN);
+      sendHilAck(command.sequence, true);
+      Serial.flush();
+      delay(50);
+      ESP.restart();
+      return;
+    default:
+      strcpy(hilLastError, "unsupported");
+      sendHilAck(command.sequence, false, "unsupported");
+      return;
+  }
+}
+
+void pollHilSerial() {
+  static char line[HIL_MAX_LINE_LENGTH] = {};
+  static size_t length = 0;
+  static bool discarding = false;
+  while (Serial.available() > 0) {
+    const char value = static_cast<char>(Serial.read());
+    if (value == '\r') continue;
+    if (value == '\n') {
+      if (discarding) {
+        discarding = false;
+        length = 0;
+        sendHilAck(0, false, "line_too_long");
+        continue;
+      }
+      if (length == 0) { sendHilAck(0, false, "empty"); continue; }
+      line[length] = '\0';
+      HilCommand command = {};
+      const HilParseResult result = hilParseCommand(line, command);
+      length = 0;
+      if (result == HIL_PARSE_OK) handleHilCommand(command);
+      else {
+        hilLastSequence = command.sequence;
+        strncpy(hilLastError, hilParseError(result), sizeof(hilLastError) - 1);
+        hilLastError[sizeof(hilLastError) - 1] = '\0';
+        sendHilAck(command.sequence, false, hilParseError(result));
+      }
+      continue;
+    }
+    if (discarding) continue;
+    if (length + 1 >= sizeof(line)) {
+      discarding = true;
+      continue;
+    }
+    line[length++] = value;
+  }
+  if (hilApplyOutputWatchdog(hilOutputGate, millis(), HIL_OUTPUT_WATCHDOG_MS)) {
+    updateMotors();
+    noTone(BUZZER_PIN);
+  }
+}
+#endif
 
 
 // ========== 主程序 ==========
@@ -732,7 +989,11 @@ void setup() {
 
 void loop() {
   static uint32_t lastVescRead = 0;
+#ifdef FAN_CONTROLLER_HIL
+  pollHilSerial();
+#else
   updateDiagnosticSerial();
+#endif
   checkFailsafe();
   updateLinkAlert();
   updateConnectionBeep();
@@ -740,10 +1001,19 @@ void loop() {
 
   // 按钮2控制蜂鸣器（按下响，松开停）
   if (updateRemoteHorn()) {
+#ifdef FAN_CONTROLLER_HIL
+    hilOutputGate.expectedBuzzer = true;
+    if (hilActualBuzzer(hilOutputGate)) tone(BUZZER_PIN, BEEP_FREQ_REMOTE_HORN);
+    else noTone(BUZZER_PIN);
+#else
     tone(BUZZER_PIN, BEEP_FREQ_REMOTE_HORN);  // 持续响，由超时保护停止
+#endif
   } else if (millis() < buzzerHoldUntil || (failsafeActive && millis() < failsafeBeepUntil)) {
     // 定时提示音由 tone(..., duration) 自动停止，这里避免被按钮逻辑立即打断。
   } else {
+#ifdef FAN_CONTROLLER_HIL
+    hilOutputGate.expectedBuzzer = false;
+#endif
     noTone(BUZZER_PIN);  // 停止
   }
 
@@ -771,6 +1041,15 @@ void loop() {
 
   if (millis() - lastVescRead > 1000) {
     lastVescRead = millis();
+#ifdef FAN_CONTROLLER_HIL
+    if (hilVescMode == HIL_VESC_VALUE) {
+      vescTelemetryValid = true;
+      batteryVoltageX100 = static_cast<uint16_t>(hilVescVoltageX100);
+      speed = static_cast<int16_t>(hilVescRpm * 0.00207f);
+    } else if (hilVescMode == HIL_VESC_FAULT) {
+      vescTelemetryValid = false;
+    } else
+#endif
     if (VESC.getVescValues()) {
       vescTelemetryValid = true;
       // Serial.println("======== VESC 数据 ========");

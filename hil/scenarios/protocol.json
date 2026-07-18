@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "name": "protocol",
+  "steps": [
+    {"command": "PING"},
+    {"command": "STATUS", "expect": {"ok": true, "outputs_unlocked": false}},
+    {"command": "NOPE", "expect_error": "unknown_command"},
+    {"command": "INPUT SPEED nope", "expect_error": "invalid_argument"},
+    {"command": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", "expect_error": "line_too_long"}
+  ]
+}

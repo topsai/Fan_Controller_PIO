@@ -21,6 +21,10 @@
 #include "diagnostic_protocol.h"
 #include "oled_chinese_font.h"
 #include "protocol.h"
+#ifdef FAN_CONTROLLER_HIL
+#include "hil_protocol.h"
+#include "hil_safety.h"
+#endif
 
 // ========== 引脚定义 ==========
 #define SWITCH_PIN_1 6   // 三档开关档位1
@@ -159,6 +163,21 @@ volatile uint8_t receiverStatusFlags = 0;
 uint32_t diagnosticStatusPackets = 0;
 uint32_t diagnosticLostPackets = 0;
 uint32_t diagnosticFaultCount = 0;
+
+#ifdef FAN_CONTROLLER_HIL
+static constexpr uint32_t HIL_OUTPUT_WATCHDOG_MS = 10000;
+HilOutputGate hilOutputGate = hilInitialOutputGate(0);
+bool hilJoystickPhysical = true;
+int hilJoystickRaw = ADC_CENTER;
+bool hilSpeedPhysical = true;
+uint8_t hilSpeedLevel = 1;
+bool hilButton1Down = false;
+bool hilButton2Down = false;
+uint32_t hilButton1ReleaseAt = 0;
+uint32_t hilButton2ReleaseAt = 0;
+uint32_t hilLastSequence = 0;
+char hilLastError[24] = "ok";
+#endif
 
 // ========== 硬件定时器中断 ==========
 void IRAM_ATTR onControlTimer() {
@@ -374,7 +393,12 @@ void setupTimer() {
 
 // ========== 输入读取函数 ==========
 void readJoystick() {
-  int raw = analogRead(JOYSTICK_PIN);
+  int raw =
+#ifdef FAN_CONTROLLER_HIL
+    hilJoystickPhysical ? analogRead(JOYSTICK_PIN) : hilJoystickRaw;
+#else
+    analogRead(JOYSTICK_PIN);
+#endif
   joystickAdcRaw = raw;
   const int16_t targetThrottle = joystickToThrottleNeutralRange(raw, joystickNeutralMin, joystickNeutralMax);
   joystickRawValue = targetThrottle;
@@ -390,6 +414,12 @@ void readJoystick() {
 }
 
 void readSwitches() {
+#ifdef FAN_CONTROLLER_HIL
+  if (!hilSpeedPhysical) {
+    speedLevel = hilSpeedLevel;
+    return;
+  }
+#endif
   // 读取三档开关（低电平有效）
   bool sw1 = !digitalRead(SWITCH_PIN_1);
   bool sw2 = !digitalRead(SWITCH_PIN_2);
@@ -414,8 +444,18 @@ void readButtons() {
   static uint32_t lastDebounce1 = 0;
   static uint32_t lastDebounce2 = 0;
 
-  bool rawBtn1 = !digitalRead(BUTTON_1_PIN);
-  bool rawBtn2 = !digitalRead(BUTTON_2_PIN);
+  bool rawBtn1 =
+#ifdef FAN_CONTROLLER_HIL
+    hilButton1Down || !digitalRead(BUTTON_1_PIN);
+#else
+    !digitalRead(BUTTON_1_PIN);
+#endif
+  bool rawBtn2 =
+#ifdef FAN_CONTROLLER_HIL
+    hilButton2Down || !digitalRead(BUTTON_2_PIN);
+#else
+    !digitalRead(BUTTON_2_PIN);
+#endif
 
   // 消抖处理（20ms）
   if (rawBtn1 != lastBtn1 && millis() - lastDebounce1 > 20) {
@@ -462,6 +502,13 @@ void beep(uint16_t frequency_hz, uint16_t duration_ms) {
   // digitalWrite(BUZZER_PIN, HIGH);
   // delay(duration_ms);
   // digitalWrite(BUZZER_PIN, LOW);
+#ifdef FAN_CONTROLLER_HIL
+  hilOutputGate.expectedBuzzer = true;
+  if (!hilActualBuzzer(hilOutputGate)) {
+    noTone(BUZZER_PIN);
+    return;
+  }
+#endif
   tone(BUZZER_PIN, frequency_hz, duration_ms);  // 自动停止
 }
 
@@ -470,7 +517,13 @@ void alarmBeep() {
   static uint32_t last = 0;
   if (millis() - last > 100) {
     last = millis();
+#ifdef FAN_CONTROLLER_HIL
+    hilOutputGate.expectedBuzzer = true;
+    if (hilActualBuzzer(hilOutputGate)) tone(BUZZER_PIN, BEEP_FREQ_LINK_ALERT, 100);
+    else noTone(BUZZER_PIN);
+#else
     tone(BUZZER_PIN, BEEP_FREQ_LINK_ALERT, 100);  // 100ms鸣叫
+#endif
   }
 }
 
@@ -490,6 +543,9 @@ void sendControlData() {
   pkt.crc = protocolCrc8((const uint8_t *)&pkt, sizeof(pkt) - 1);
 
   // 非阻塞发送
+#ifdef FAN_CONTROLLER_HIL
+  if (!hilOutputGate.unlocked) return;
+#endif
   esp_err_t result = esp_now_send(receiverMac, (uint8_t *)&pkt, sizeof(pkt));
 
   if (result != ESP_OK) {
@@ -547,6 +603,7 @@ void handleDiagnosticCommand(const String &line) {
     printDiagnosticStatus();
     return;
   }
+#ifdef FAN_CONTROLLER_HIL
   if (line.startsWith("DIAG SIMSTATUS ")) {
     int rssi = -60;
     int voltage = 4800;
@@ -567,6 +624,7 @@ void handleDiagnosticCommand(const String &line) {
     Serial.println("DIAG OK simstatus");
     return;
   }
+#endif
   if (line.length() > 0) {
     Serial.println("DIAG ERR unknown");
     diagnosticFaultCount++;
@@ -592,6 +650,134 @@ void updateDiagnosticSerial() {
     }
   }
 }
+
+#ifdef FAN_CONTROLLER_HIL
+void sendHilAck(uint32_t sequence, bool ok, const char *error = nullptr) {
+  Serial.printf("{\"type\":\"ack\",\"sequence\":%lu,\"ok\":%s",
+                static_cast<unsigned long>(sequence), ok ? "true" : "false");
+  if (error != nullptr) Serial.printf(",\"error\":\"%s\"", error);
+  Serial.println("}");
+}
+
+bool decodeHilHex(const char *text, uint8_t *output, size_t capacity, size_t &length) {
+  length = 0;
+  const size_t textLength = text == nullptr ? 0 : strlen(text);
+  if (textLength == 0 || (textLength & 1u) != 0 || textLength / 2 > capacity) return false;
+  for (size_t i = 0; i < textLength; i += 2) {
+    char pair[3] = {text[i], text[i + 1], '\0'};
+    char *end = nullptr;
+    const unsigned long value = strtoul(pair, &end, 16);
+    if (end != pair + 2 || value > 255) return false;
+    output[length++] = static_cast<uint8_t>(value);
+  }
+  return true;
+}
+
+void sendHilStatus(uint32_t sequence) {
+  Serial.printf("{\"type\":\"status\",\"sequence\":%lu,\"ok\":true,"
+                "\"firmware\":\"fan-controller-c3-transmitter\",\"protocol\":%u,\"role\":\"transmitter\","
+                "\"uptime_ms\":%lu,\"last_sequence\":%lu,\"last_result\":\"%s\",",
+                static_cast<unsigned long>(sequence), HIL_PROTOCOL_VERSION, static_cast<unsigned long>(millis()),
+                static_cast<unsigned long>(hilLastSequence), hilLastError);
+  Serial.printf("\"outputs_unlocked\":%s,\"connected\":%s,\"armed\":%s,\"settings_mode\":%s,"
+                "\"input_modes\":{\"joystick\":\"%s\",\"speed\":\"%s\"},",
+                hilOutputGate.unlocked ? "true" : "false", connected ? "true" : "false",
+                transmitterArmed ? "true" : "false", settingsMode ? "true" : "false",
+                hilJoystickPhysical ? "physical" : "value", hilSpeedPhysical ? "physical" : "value");
+  Serial.printf("\"joystick\":{\"adc\":%d,\"raw\":%d,\"output\":%d,\"neutral_min\":%d,"
+                "\"neutral_max\":%d,\"center\":%d},\"speed_level\":%u,\"buttons\":%u,",
+                joystickAdcRaw, joystickRawValue, joystickValue, joystickNeutralMin, joystickNeutralMax,
+                joystickCenter, speedLevel, buttonState);
+  Serial.printf("\"receiver\":{\"rssi\":%d,\"voltage_x100\":%u,\"speed\":%u,\"status_flags\":%u},"
+                "\"battery\":{\"valid\":%s,\"voltage\":%.3f,\"percent\":%u},"
+                "\"expected_outputs\":{\"radio_send\":true,\"buzzer\":%s},"
+                "\"actual_outputs\":{\"radio_send\":%s,\"buzzer\":%s}}\n",
+                rssiValue, voltageValue, speedValue, receiverStatusFlags, cw2015Available ? "true" : "false",
+                localBatteryVoltage, localBatteryPercent, hilOutputGate.expectedBuzzer ? "true" : "false",
+                hilOutputGate.unlocked ? "true" : "false", hilActualBuzzer(hilOutputGate) ? "true" : "false");
+}
+
+void handleHilCommand(const HilCommand &command) {
+  hilLastSequence = command.sequence;
+  strcpy(hilLastError, "ok");
+  hilOutputGate.lastCommandAt = millis();
+  switch (command.type) {
+    case HIL_COMMAND_PING: sendHilAck(command.sequence, true); return;
+    case HIL_COMMAND_STATUS: sendHilStatus(command.sequence); return;
+    case HIL_COMMAND_OUTPUTS_LOCK:
+      hilSetOutputsUnlocked(hilOutputGate, false, millis()); noTone(BUZZER_PIN); sendHilAck(command.sequence, true); return;
+    case HIL_COMMAND_OUTPUTS_UNLOCK:
+      hilSetOutputsUnlocked(hilOutputGate, true, millis()); sendHilAck(command.sequence, true); return;
+    case HIL_COMMAND_INPUT_JOYSTICK:
+      if (strcmp(command.text, "PHYSICAL") == 0 || strcmp(command.text, "physical") == 0) hilJoystickPhysical = true;
+      else if (command.values[0] >= 0 && command.values[0] <= 4095) { hilJoystickPhysical = false; hilJoystickRaw = command.values[0]; }
+      else { sendHilAck(command.sequence, false, "invalid_argument"); return; }
+      sendHilAck(command.sequence, true); return;
+    case HIL_COMMAND_INPUT_SPEED:
+      if (strcmp(command.text, "PHYSICAL") == 0 || strcmp(command.text, "physical") == 0) hilSpeedPhysical = true;
+      else if (command.values[0] >= 1 && command.values[0] <= 3) { hilSpeedPhysical = false; hilSpeedLevel = command.values[0]; }
+      else { sendHilAck(command.sequence, false, "invalid_argument"); return; }
+      sendHilAck(command.sequence, true); return;
+    case HIL_COMMAND_BUTTON_CLICK:
+    case HIL_COMMAND_BUTTON_HOLD: {
+      const uint32_t duration = command.type == HIL_COMMAND_BUTTON_CLICK ? 80u : static_cast<uint32_t>(command.values[0]);
+      if (duration < 40 || duration > 30000) { sendHilAck(command.sequence, false, "invalid_argument"); return; }
+      if (strcmp(command.text, "1") == 0) { hilButton1Down = true; hilButton1ReleaseAt = millis() + duration; }
+      else if (strcmp(command.text, "2") == 0) { hilButton2Down = true; hilButton2ReleaseAt = millis() + duration; }
+      else { sendHilAck(command.sequence, false, "invalid_argument"); return; }
+      sendHilAck(command.sequence, true); return;
+    }
+    case HIL_COMMAND_STATUS_FRAME: {
+      uint8_t bytes[sizeof(StatusPacket)] = {};
+      size_t length = 0;
+      if (!decodeHilHex(command.data, bytes, sizeof(bytes), length)) { sendHilAck(command.sequence, false, "invalid_argument"); return; }
+      const uint32_t before = diagnosticStatusPackets;
+      onDataRecv(receiverMac, bytes, static_cast<int>(length));
+      if (diagnosticStatusPackets == before) { sendHilAck(command.sequence, false, "frame_rejected"); return; }
+      sendHilAck(command.sequence, true); return;
+    }
+    case HIL_COMMAND_NVS_CLEAR:
+      preferences.begin(SETTINGS_NAMESPACE, false); preferences.clear(); preferences.end();
+      sendHilAck(command.sequence, true); return;
+    case HIL_COMMAND_RESET:
+      hilSetOutputsUnlocked(hilOutputGate, false, millis()); hilJoystickPhysical = true; hilSpeedPhysical = true;
+      hilButton1Down = false; hilButton2Down = false; transmitterArmed = false; joystickValue = 0;
+      noTone(BUZZER_PIN); sendHilAck(command.sequence, true); return;
+    case HIL_COMMAND_REBOOT:
+      hilSetOutputsUnlocked(hilOutputGate, false, millis()); noTone(BUZZER_PIN); sendHilAck(command.sequence, true);
+      Serial.flush(); delay(50); ESP.restart(); return;
+    default: strcpy(hilLastError, "unsupported"); sendHilAck(command.sequence, false, "unsupported"); return;
+  }
+}
+
+void pollHilSerial() {
+  static char line[HIL_MAX_LINE_LENGTH] = {};
+  static size_t length = 0;
+  static bool discarding = false;
+  while (Serial.available() > 0) {
+    const char value = static_cast<char>(Serial.read());
+    if (value == '\r') continue;
+    if (value == '\n') {
+      if (discarding) { discarding = false; length = 0; sendHilAck(0, false, "line_too_long"); continue; }
+      if (length == 0) { sendHilAck(0, false, "empty"); continue; }
+      line[length] = '\0';
+      HilCommand command = {};
+      const HilParseResult result = hilParseCommand(line, command);
+      length = 0;
+      if (result == HIL_PARSE_OK) handleHilCommand(command);
+      else { strncpy(hilLastError, hilParseError(result), sizeof(hilLastError) - 1); sendHilAck(command.sequence, false, hilParseError(result)); }
+      continue;
+    }
+    if (discarding) continue;
+    if (length + 1 >= sizeof(line)) { discarding = true; continue; }
+    line[length++] = value;
+  }
+  const uint32_t now = millis();
+  if (hilButton1Down && static_cast<int32_t>(now - hilButton1ReleaseAt) >= 0) hilButton1Down = false;
+  if (hilButton2Down && static_cast<int32_t>(now - hilButton2ReleaseAt) >= 0) hilButton2Down = false;
+  if (hilApplyOutputWatchdog(hilOutputGate, now, HIL_OUTPUT_WATCHDOG_MS)) noTone(BUZZER_PIN);
+}
+#endif
 
 // ========== 连接状态检测 ==========
 void checkConnection() {
@@ -796,7 +982,11 @@ void setup() {
 }
 
 void loop() {
+#ifdef FAN_CONTROLLER_HIL
+  pollHilSerial();
+#else
   updateDiagnosticSerial();
+#endif
   // 1. 读取所有输入（每次循环都读，保证实时性）
   readJoystick();
   readSwitches();

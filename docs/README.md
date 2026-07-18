@@ -21,6 +21,7 @@
 | `squareline-data-binding.md` | SquareLine 控件命名、数据来源和代码绑定规则 |
 | `s3-ui-final-components.md` | S3 最终页面和组件对象名清单 |
 | `ui-field-reference.md` | S3 每个 Screen/组件、C3 OLED 每个页面/字段的调试字典 |
+| `hil-testing.md` | 单芯片串口 HIL 固件、Python 桌面工具、安全锁、场景和报告 |
 | `progress.md` | 项目推进记录 |
 | `bugs.md` | bug/风险/维护项跟踪 |
 | `decisions.md` | 已确认设计决策和依据 |

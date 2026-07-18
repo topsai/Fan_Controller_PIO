@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "name": "receiver safety",
+  "steps": [
+    {"command": "RESET"},
+    {"command": "STATUS", "expect": {"outputs_unlocked": false, "actual_outputs.pwm": 76}},
+    {"command": "REMOTE CONTROL c3 500 1 0 0"},
+    {"command": "REMOTE CONTROL c3 500 1 0 0"},
+    {"command": "REMOTE CONTROL c3 500 1 0 0"},
+    {"command": "STATUS", "expect": {"connected": true, "active_controller": "c3", "actual_outputs.pwm": 76}},
+    {"wait_seconds": 2.2, "heartbeat_seconds": 0.5},
+    {"command": "STATUS", "expect": {"connected": false, "failsafe": true, "actual_outputs.pwm": 76}}
+  ]
+}

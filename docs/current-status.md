@@ -1,6 +1,6 @@
 # 当前项目状态
 
-更新日期：2026-06-15
+更新日期：2026-07-18
 
 ## 当前应优先阅读的文档
 
@@ -28,13 +28,19 @@
 - C3 基础版遥控器当前约定端口为 COM5。
 - S3 高级遥控器当前常用端口为 COM3。
 - 已新增串口诊断注入测试脚本，10 秒默认运行，30 分钟稳定性测试必须手动 `--long` 触发。
+- 已新增三角色单芯片串口 HIL：接收器、C3 遥控器和 S3 遥控器均有独立 HIL 构建环境。
+- 已新增纯 Python tkinter HIL 仪表板、版本化 JSON 场景和 JSON/CSV/Markdown 报告。
+- 正式固件与 HIL 固件已通过二进制协议标识隔离检查。
 
 ## 本轮验证结果
 
-- `pio test -e native`：PASS，46/46。
+- `pio test -e native`：PASS，70/70。
+- `python -m unittest discover -s hil/tests -v`：PASS，14/14。
 - `pio run -e transmitter`：SUCCESS。
 - `pio run -e receiver`：SUCCESS。
 - `pio run -e s3_transmitter`：SUCCESS。
+- 正式/HIL 共 8 个环境 clean build：SUCCESS。
+- 2026-07-18 未连接硬件，烧录、串口场景和实机功能测试未执行。
 - 本轮上传和串口连通性结果见最新 `docs/test-runs/` 记录。
 
 ## UI 后续添加

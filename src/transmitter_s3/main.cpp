@@ -14,6 +14,10 @@
 #include "s3_runtime_config.h"
 #include "s3_ui_bindings.h"
 #include "ui/ui.h"
+#ifdef FAN_CONTROLLER_HIL
+#include "hil_protocol.h"
+#include "hil_safety.h"
+#endif
 
 namespace {
 
@@ -313,7 +317,32 @@ uint8_t userBrightness = LCD_BRIGHTNESS;
 uint8_t currentBrightness = LCD_BRIGHTNESS;
 TaskHandle_t controlTaskHandle = nullptr;
 
+#ifdef FAN_CONTROLLER_HIL
+static constexpr uint32_t HIL_OUTPUT_WATCHDOG_MS = 10000;
+HilOutputGate hilOutputGate = hilInitialOutputGate(0);
+bool hilJoystickPhysical = true;
+int hilJoystickRaw = ADC_CENTER;
+bool hilSpeedPhysical = true;
+uint8_t hilSpeedLevel = 1;
+bool hilButton1Down = false;
+bool hilButton2Down = false;
+uint32_t hilButton1ReleaseAt = 0;
+uint32_t hilButton2ReleaseAt = 0;
+uint32_t hilLastSequence = 0;
+char hilLastError[24] = "ok";
+enum HilSensorMode : uint8_t { HIL_SENSOR_PHYSICAL, HIL_SENSOR_VALUE, HIL_SENSOR_FAULT };
+HilSensorMode hilCwMode = HIL_SENSOR_PHYSICAL;
+HilSensorMode hilBmpMode = HIL_SENSOR_PHYSICAL;
+HilSensorMode hilCompassMode = HIL_SENSOR_PHYSICAL;
+HilSensorMode hilMcuMode = HIL_SENSOR_PHYSICAL;
+float hilCwValue = 0.0f;
+float hilBmpValue = 0.0f;
+float hilCompassValue = 0.0f;
+float hilMcuValue = 0.0f;
+#endif
+
 void startControlSendTask();
+bool processStatusFrame(const uint8_t *data, int len);
 
 uint16_t mapTouchX(uint16_t rawX) {
   return 239 - rawX;
@@ -361,6 +390,13 @@ int16_t s16le(const uint8_t *p) {
 }
 
 void beep(uint16_t frequencyHz, uint16_t durationMs) {
+#ifdef FAN_CONTROLLER_HIL
+  hilOutputGate.expectedBuzzer = true;
+  if (!hilActualBuzzer(hilOutputGate)) {
+    noTone(BUZZER_PIN);
+    return;
+  }
+#endif
   tone(BUZZER_PIN, frequencyHz, durationMs);
 }
 
@@ -622,6 +658,16 @@ void readLocalSensors() {
   readCw2015();
   readBmp280();
   readQmc5883l();
+#ifdef FAN_CONTROLLER_HIL
+  if (hilCwMode == HIL_SENSOR_VALUE) { cw2015.present = true; cw2015.valid = true; cw2015.voltage = hilCwValue; cw2015.soc = constrain(hilCwValue * 20.0f, 0.0f, 100.0f); }
+  else if (hilCwMode == HIL_SENSOR_FAULT) { cw2015.present = true; cw2015.valid = false; }
+  if (hilBmpMode == HIL_SENSOR_VALUE) { bmp280.present = true; bmp280.valid = true; bmp280.temperatureC = hilBmpValue; bmp280.pressureHpa = 1013.25f; bmp280.altitudeM = 0.0f; }
+  else if (hilBmpMode == HIL_SENSOR_FAULT) { bmp280.present = true; bmp280.valid = false; }
+  if (hilCompassMode == HIL_SENSOR_VALUE) { qmc.present = true; qmc.valid = true; qmc.headingDeg = hilCompassValue; }
+  else if (hilCompassMode == HIL_SENSOR_FAULT) { qmc.present = true; qmc.valid = false; }
+  if (hilMcuMode == HIL_SENSOR_VALUE) mcuTemperatureC = hilMcuValue;
+  else if (hilMcuMode == HIL_SENSOR_FAULT) mcuTemperatureC = NAN;
+#endif
 }
 
 void setupPins() {
@@ -657,7 +703,12 @@ void calibrateJoystickCenter() {
 }
 
 void readInputs() {
-  joystickAdcRaw = analogRead(JOYSTICK_PIN);
+  joystickAdcRaw =
+#ifdef FAN_CONTROLLER_HIL
+    hilJoystickPhysical ? analogRead(JOYSTICK_PIN) : hilJoystickRaw;
+#else
+    analogRead(JOYSTICK_PIN);
+#endif
   const int16_t targetThrottle = joystickToThrottleCalibrated(joystickAdcRaw, joystickCalibration);
   if (abs(targetThrottle) > JOYSTICK_DEADZONE) {
     markUserActivity();
@@ -674,8 +725,21 @@ void readInputs() {
   joystickValue = slewLimitedThrottle(joystickValue, safeTarget, THROTTLE_SLEW_STEP);
 
 #if defined(S3_NEW_PCB_PINOUT) && S3_NEW_PCB_PINOUT
-  speedAdcRaw = (uint16_t)analogRead(SPEED_LEVEL_ADC_PIN);
-  speedLevel = s3SpeedLevelFromAdc(speedAdcRaw);
+  if (
+#ifdef FAN_CONTROLLER_HIL
+      !hilSpeedPhysical
+#else
+      false
+#endif
+  ) {
+#ifdef FAN_CONTROLLER_HIL
+    speedLevel = hilSpeedLevel;
+    speedAdcRaw = speedLevel == 1 ? 0 : (speedLevel == 2 ? 2048 : 4095);
+#endif
+  } else {
+    speedAdcRaw = (uint16_t)analogRead(SPEED_LEVEL_ADC_PIN);
+    speedLevel = s3SpeedLevelFromAdc(speedAdcRaw);
+  }
 #else
   const bool sw1 = !digitalRead(SWITCH_PIN_1);
   const bool sw2 = !digitalRead(SWITCH_PIN_2);
@@ -688,11 +752,25 @@ void readInputs() {
   } else {
     speedLevel = 1;
   }
+#ifdef FAN_CONTROLLER_HIL
+  if (!hilSpeedPhysical) speedLevel = hilSpeedLevel;
+#endif
 #endif
 
   uint8_t nextButtons = 0;
-  const bool button1Down = !digitalRead(BUTTON_1_PIN);
-  if (!digitalRead(BUTTON_2_PIN)) {
+  const bool button1Down =
+#ifdef FAN_CONTROLLER_HIL
+    hilButton1Down || !digitalRead(BUTTON_1_PIN);
+#else
+    !digitalRead(BUTTON_1_PIN);
+#endif
+  const bool button2Down =
+#ifdef FAN_CONTROLLER_HIL
+    hilButton2Down || !digitalRead(BUTTON_2_PIN);
+#else
+    !digitalRead(BUTTON_2_PIN);
+#endif
+  if (button2Down) {
     nextButtons |= 0x02;
   }
   static uint8_t lastButtons = 0;
@@ -848,22 +926,31 @@ void setupEspNow() {
 
   esp_now_register_send_cb([](const uint8_t *, esp_now_send_status_t) {});
   esp_now_register_recv_cb([](const uint8_t *, const uint8_t *data, int len) {
+    processStatusFrame(data, len);
+  });
+
+  Serial.print("S3 transmitter MAC: ");
+  Serial.println(WiFi.macAddress());
+  startControlSendTask();
+}
+
+bool processStatusFrame(const uint8_t *data, int len) {
     if (len != sizeof(StatusPacket)) {
       diagnosticFaultCount++;
-      return;
+      return false;
     }
     const StatusPacket *pkt = (const StatusPacket *)data;
     if (pkt->head != STATUS_PACKET_HEAD || pkt->type != STATUS_PACKET_TYPE || pkt->version != STATUS_PROTOCOL_VERSION) {
       diagnosticFaultCount++;
-      return;
+      return false;
     }
     if (protocolCrc8((const uint8_t *)pkt, sizeof(StatusPacket) - 1) != pkt->crc) {
       diagnosticFaultCount++;
-      return;
+      return false;
     }
     if (!protocolSequenceIsFresh(pkt->sequence, lastStatusSequence, hasStatusSequence)) {
       diagnosticFaultCount++;
-      return;
+      return false;
     }
     if (hasStatusSequence) {
       const uint16_t delta = (uint16_t)(pkt->sequence - lastStatusSequence);
@@ -881,11 +968,7 @@ void setupEspNow() {
     lastRecvTime = millis();
     connected = true;
     everReceivedStatusPacket = true;
-  });
-
-  Serial.print("S3 transmitter MAC: ");
-  Serial.println(WiFi.macAddress());
-  startControlSendTask();
+    return true;
 }
 
 void sendControlPacket() {
@@ -902,6 +985,9 @@ void sendControlPacket() {
     pkt.flags |= CONTROL_FLAG_TAKEOVER_REQUEST;
   }
   pkt.crc = protocolCrc8((const uint8_t *)&pkt, sizeof(pkt) - 1);
+#ifdef FAN_CONTROLLER_HIL
+  if (!hilOutputGate.unlocked) return;
+#endif
   esp_now_send(receiverMac, (const uint8_t *)&pkt, sizeof(pkt));
 }
 
@@ -1030,6 +1116,7 @@ void handleDiagnosticCommand(const String &line) {
     printDiagnosticStatus();
     return;
   }
+#ifdef FAN_CONTROLLER_HIL
   if (line.startsWith("DIAG SIMSTATUS ")) {
     int rssi = -60;
     int voltage = 4800;
@@ -1052,6 +1139,7 @@ void handleDiagnosticCommand(const String &line) {
     Serial.println("DIAG OK simstatus");
     return;
   }
+#endif
   if (line.length() > 0) {
     Serial.println("DIAG ERR unknown");
     diagnosticFaultCount++;
@@ -1077,6 +1165,172 @@ void updateDiagnosticSerial() {
     }
   }
 }
+
+#ifdef FAN_CONTROLLER_HIL
+void sendHilAck(uint32_t sequence, bool ok, const char *error = nullptr) {
+  Serial.printf("{\"type\":\"ack\",\"sequence\":%lu,\"ok\":%s",
+                static_cast<unsigned long>(sequence), ok ? "true" : "false");
+  if (error != nullptr) Serial.printf(",\"error\":\"%s\"", error);
+  Serial.println("}");
+}
+
+bool decodeHilHex(const char *text, uint8_t *output, size_t capacity, size_t &length) {
+  length = 0;
+  const size_t textLength = text == nullptr ? 0 : strlen(text);
+  if (textLength == 0 || (textLength & 1u) != 0 || textLength / 2 > capacity) return false;
+  for (size_t i = 0; i < textLength; i += 2) {
+    char pair[3] = {text[i], text[i + 1], '\0'};
+    char *end = nullptr;
+    const unsigned long value = strtoul(pair, &end, 16);
+    if (end != pair + 2 || value > 255) return false;
+    output[length++] = static_cast<uint8_t>(value);
+  }
+  return true;
+}
+
+const char *hilSensorModeName(HilSensorMode mode) {
+  return mode == HIL_SENSOR_PHYSICAL ? "physical" : (mode == HIL_SENSOR_VALUE ? "value" : "fault");
+}
+
+void sendHilStatus(uint32_t sequence) {
+  Serial.printf("{\"type\":\"status\",\"sequence\":%lu,\"ok\":true,"
+                "\"firmware\":\"%s\",\"protocol\":%u,\"role\":\"s3_transmitter\","
+                "\"uptime_ms\":%lu,\"last_sequence\":%lu,\"last_result\":\"%s\",",
+                static_cast<unsigned long>(sequence), S3_FIRMWARE_VERSION, HIL_PROTOCOL_VERSION,
+                static_cast<unsigned long>(millis()), static_cast<unsigned long>(hilLastSequence), hilLastError);
+  Serial.printf("\"outputs_unlocked\":%s,\"connected\":%s,\"armed\":%s,\"settings_mode\":%s,"
+                "\"input_modes\":{\"joystick\":\"%s\",\"speed\":\"%s\",\"cw2015\":\"%s\","
+                "\"bmp280\":\"%s\",\"compass\":\"%s\",\"mcu\":\"%s\"},",
+                hilOutputGate.unlocked ? "true" : "false", connected ? "true" : "false",
+                transmitterArmed ? "true" : "false", settingsMode ? "true" : "false",
+                hilJoystickPhysical ? "physical" : "value", hilSpeedPhysical ? "physical" : "value",
+                hilSensorModeName(hilCwMode), hilSensorModeName(hilBmpMode), hilSensorModeName(hilCompassMode),
+                hilSensorModeName(hilMcuMode));
+  Serial.printf("\"joystick\":{\"adc\":%d,\"raw\":%d,\"output\":%d,\"center\":%d,"
+                "\"min\":%d,\"max\":%d,\"deadzone\":%d},\"speed_level\":%u,\"buttons\":%u,",
+                joystickAdcRaw, joystickRawValue, joystickValue, joystickCalibration.center,
+                joystickCalibration.minRaw, joystickCalibration.maxRaw, joystickCalibration.deadzone,
+                speedLevel, buttonState);
+  Serial.printf("\"receiver\":{\"rssi\":%d,\"voltage_x100\":%u,\"speed\":%u,\"status_flags\":%u,"
+                "\"packets\":%lu,\"lost\":%u},",
+                rssiValue, receiverVoltageX100, receiverSpeed, receiverStatusFlags,
+                static_cast<unsigned long>(diagnosticStatusPackets), statusLostPackets);
+  Serial.printf("\"sensors\":{\"battery_valid\":%s,\"battery_voltage\":%.3f,\"battery_percent\":%.1f,"
+                "\"bmp_valid\":%s,\"bmp_temperature\":%.2f,\"pressure_hpa\":%.2f,"
+                "\"compass_valid\":%s,\"heading\":%.2f,\"mcu_temperature\":%.2f},",
+                cw2015.valid ? "true" : "false", cw2015.voltage, cw2015.soc,
+                bmp280.valid ? "true" : "false", bmp280.temperatureC, bmp280.pressureHpa,
+                qmc.valid ? "true" : "false", qmc.headingDeg, mcuTemperatureC);
+  Serial.printf("\"display\":{\"brightness\":%u,\"dimmed\":%s},"
+                "\"expected_outputs\":{\"radio_send\":true,\"buzzer\":%s},"
+                "\"actual_outputs\":{\"radio_send\":%s,\"buzzer\":%s}}\n",
+                currentBrightness, currentBrightness == LCD_DIM_BRIGHTNESS ? "true" : "false",
+                hilOutputGate.expectedBuzzer ? "true" : "false", hilOutputGate.unlocked ? "true" : "false",
+                hilActualBuzzer(hilOutputGate) ? "true" : "false");
+}
+
+HilSensorMode *sensorModeForName(const char *name, float *&value) {
+  if (strcmp(name, "CW2015") == 0) { value = &hilCwValue; return &hilCwMode; }
+  if (strcmp(name, "BMP280") == 0) { value = &hilBmpValue; return &hilBmpMode; }
+  if (strcmp(name, "COMPASS") == 0 || strcmp(name, "QMC5883L") == 0) { value = &hilCompassValue; return &hilCompassMode; }
+  if (strcmp(name, "MCU") == 0) { value = &hilMcuValue; return &hilMcuMode; }
+  value = nullptr;
+  return nullptr;
+}
+
+void handleHilCommand(const HilCommand &command) {
+  hilLastSequence = command.sequence;
+  strcpy(hilLastError, "ok");
+  hilOutputGate.lastCommandAt = millis();
+  switch (command.type) {
+    case HIL_COMMAND_PING: sendHilAck(command.sequence, true); return;
+    case HIL_COMMAND_STATUS: sendHilStatus(command.sequence); return;
+    case HIL_COMMAND_OUTPUTS_LOCK:
+      hilSetOutputsUnlocked(hilOutputGate, false, millis()); noTone(BUZZER_PIN); sendHilAck(command.sequence, true); return;
+    case HIL_COMMAND_OUTPUTS_UNLOCK:
+      hilSetOutputsUnlocked(hilOutputGate, true, millis()); sendHilAck(command.sequence, true); return;
+    case HIL_COMMAND_INPUT_JOYSTICK:
+      if (strcmp(command.text, "PHYSICAL") == 0 || strcmp(command.text, "physical") == 0) hilJoystickPhysical = true;
+      else if (command.values[0] >= 0 && command.values[0] <= 4095) { hilJoystickPhysical = false; hilJoystickRaw = command.values[0]; }
+      else { sendHilAck(command.sequence, false, "invalid_argument"); return; }
+      sendHilAck(command.sequence, true); return;
+    case HIL_COMMAND_INPUT_SPEED:
+      if (strcmp(command.text, "PHYSICAL") == 0 || strcmp(command.text, "physical") == 0) hilSpeedPhysical = true;
+      else if (command.values[0] >= 1 && command.values[0] <= 3) { hilSpeedPhysical = false; hilSpeedLevel = command.values[0]; }
+      else { sendHilAck(command.sequence, false, "invalid_argument"); return; }
+      sendHilAck(command.sequence, true); return;
+    case HIL_COMMAND_BUTTON_CLICK:
+    case HIL_COMMAND_BUTTON_HOLD: {
+      const uint32_t duration = command.type == HIL_COMMAND_BUTTON_CLICK ? 80u : static_cast<uint32_t>(command.values[0]);
+      if (duration < 40 || duration > 30000) { sendHilAck(command.sequence, false, "invalid_argument"); return; }
+      if (strcmp(command.text, "1") == 0) { hilButton1Down = true; hilButton1ReleaseAt = millis() + duration; }
+      else if (strcmp(command.text, "2") == 0) { hilButton2Down = true; hilButton2ReleaseAt = millis() + duration; }
+      else { sendHilAck(command.sequence, false, "invalid_argument"); return; }
+      sendHilAck(command.sequence, true); return;
+    }
+    case HIL_COMMAND_STATUS_FRAME: {
+      uint8_t bytes[sizeof(StatusPacket)] = {};
+      size_t length = 0;
+      if (!decodeHilHex(command.data, bytes, sizeof(bytes), length) || !processStatusFrame(bytes, static_cast<int>(length))) {
+        sendHilAck(command.sequence, false, "frame_rejected"); return;
+      }
+      sendHilAck(command.sequence, true); return;
+    }
+    case HIL_COMMAND_SENSOR_PHYSICAL:
+    case HIL_COMMAND_SENSOR_VALUE:
+    case HIL_COMMAND_SENSOR_FAULT: {
+      float *value = nullptr;
+      HilSensorMode *mode = sensorModeForName(command.text, value);
+      if (mode == nullptr) { sendHilAck(command.sequence, false, "unsupported"); return; }
+      if (command.type == HIL_COMMAND_SENSOR_PHYSICAL) *mode = HIL_SENSOR_PHYSICAL;
+      else if (command.type == HIL_COMMAND_SENSOR_FAULT) *mode = HIL_SENSOR_FAULT;
+      else { *mode = HIL_SENSOR_VALUE; *value = command.realValues[0]; }
+      readLocalSensors();
+      sendHilAck(command.sequence, true); return;
+    }
+    case HIL_COMMAND_NVS_CLEAR:
+      preferences.begin(DISPLAY_NAMESPACE, false); preferences.clear(); preferences.end();
+      preferences.begin(CALIBRATION_NAMESPACE, false); preferences.clear(); preferences.end();
+      sendHilAck(command.sequence, true); return;
+    case HIL_COMMAND_RESET:
+      hilSetOutputsUnlocked(hilOutputGate, false, millis()); hilJoystickPhysical = true; hilSpeedPhysical = true;
+      hilButton1Down = false; hilButton2Down = false; hilCwMode = hilBmpMode = hilCompassMode = hilMcuMode = HIL_SENSOR_PHYSICAL;
+      transmitterArmed = false; joystickValue = 0; noTone(BUZZER_PIN); sendHilAck(command.sequence, true); return;
+    case HIL_COMMAND_REBOOT:
+      hilSetOutputsUnlocked(hilOutputGate, false, millis()); noTone(BUZZER_PIN); sendHilAck(command.sequence, true);
+      Serial.flush(); delay(50); ESP.restart(); return;
+    default: strcpy(hilLastError, "unsupported"); sendHilAck(command.sequence, false, "unsupported"); return;
+  }
+}
+
+void pollHilSerial() {
+  static char line[HIL_MAX_LINE_LENGTH] = {};
+  static size_t length = 0;
+  static bool discarding = false;
+  while (Serial.available() > 0) {
+    const char value = static_cast<char>(Serial.read());
+    if (value == '\r') continue;
+    if (value == '\n') {
+      if (discarding) { discarding = false; length = 0; sendHilAck(0, false, "line_too_long"); continue; }
+      if (length == 0) { sendHilAck(0, false, "empty"); continue; }
+      line[length] = '\0';
+      HilCommand command = {};
+      const HilParseResult result = hilParseCommand(line, command);
+      length = 0;
+      if (result == HIL_PARSE_OK) handleHilCommand(command);
+      else { strncpy(hilLastError, hilParseError(result), sizeof(hilLastError) - 1); sendHilAck(command.sequence, false, hilParseError(result)); }
+      continue;
+    }
+    if (discarding) continue;
+    if (length + 1 >= sizeof(line)) { discarding = true; continue; }
+    line[length++] = value;
+  }
+  const uint32_t now = millis();
+  if (hilButton1Down && static_cast<int32_t>(now - hilButton1ReleaseAt) >= 0) hilButton1Down = false;
+  if (hilButton2Down && static_cast<int32_t>(now - hilButton2ReleaseAt) >= 0) hilButton2Down = false;
+  if (hilApplyOutputWatchdog(hilOutputGate, now, HIL_OUTPUT_WATCHDOG_MS)) noTone(BUZZER_PIN);
+}
+#endif
 
 }  // namespace
 
@@ -1110,7 +1364,11 @@ void setup() {
 }
 
 void loop() {
+#ifdef FAN_CONTROLLER_HIL
+  pollHilSerial();
+#else
   updateDiagnosticSerial();
+#endif
   readInputs();
   if (joystickCenterAdjust != 0) {
     joystickCenter = adjustedJoystickCenter(joystickCenter, joystickCenterAdjust);

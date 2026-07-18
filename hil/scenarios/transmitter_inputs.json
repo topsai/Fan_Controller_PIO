@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "name": "transmitter inputs",
+  "steps": [
+    {"command": "RESET"},
+    {"command": "INPUT SPEED 3"},
+    {"command": "INPUT JOYSTICK 2048"},
+    {"wait_seconds": 0.1},
+    {"command": "STATUS", "expect": {"outputs_unlocked": false, "speed_level": 3}},
+    {"command": "BUTTON 1 CLICK"},
+    {"wait_seconds": 0.15},
+    {"command": "STATUS", "expect": {"settings_mode": true}},
+    {"command": "INPUT JOYSTICK PHYSICAL"},
+    {"command": "INPUT SPEED PHYSICAL"}
+  ]
+}

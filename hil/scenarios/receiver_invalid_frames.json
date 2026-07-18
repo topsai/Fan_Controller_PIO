@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "name": "receiver invalid frames",
+  "steps": [
+    {"command": "RESET"},
+    {"command": "REMOTE INVALID c3 crc"},
+    {"command": "REMOTE INVALID c3 unknown_address"},
+    {"command": "REMOTE INVALID c3 unknown_command"},
+    {"command": "REMOTE INVALID c3 truncated"},
+    {"command": "STATUS", "expect": {"connected": false, "outputs_unlocked": false}}
+  ]
+}

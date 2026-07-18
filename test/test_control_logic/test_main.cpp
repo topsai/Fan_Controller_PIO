@@ -1,4 +1,9 @@
 #include <unity.h>
+#include <receiver_frame.h>
+#ifdef FAN_CONTROLLER_HIL
+#include <hil_protocol.h>
+#include <hil_safety.h>
+#endif
 #include "control_logic.h"
 #include "beep_profiles.h"
 #include "protocol.h"
@@ -617,6 +622,124 @@ void test_s3_speed_level_from_adc_matches_ladder_ranges() {
   TEST_ASSERT_EQUAL_UINT8(3, s3SpeedLevelFromAdc(4095));
 }
 
+#ifdef FAN_CONTROLLER_HIL
+void test_hil_protocol_parses_sequence_and_receiver_control() {
+  HilCommand command = {};
+  TEST_ASSERT_EQUAL(HIL_PARSE_OK,
+                    hilParseCommand("HIL 42 REMOTE CONTROL c3 -250 2 2 1", command));
+  TEST_ASSERT_EQUAL_UINT32(42, command.sequence);
+  TEST_ASSERT_EQUAL(HIL_COMMAND_REMOTE_CONTROL, command.type);
+  TEST_ASSERT_EQUAL_STRING("c3", command.text);
+  TEST_ASSERT_EQUAL_INT32(-250, command.values[0]);
+  TEST_ASSERT_EQUAL_INT32(2, command.values[1]);
+  TEST_ASSERT_EQUAL_INT32(2, command.values[2]);
+  TEST_ASSERT_EQUAL_INT32(1, command.values[3]);
+}
+
+void test_hil_protocol_rejects_missing_extra_and_invalid_arguments() {
+  HilCommand command = {};
+  TEST_ASSERT_EQUAL(HIL_PARSE_INVALID_ARGUMENT, hilParseCommand("HIL 1 OUTPUTS", command));
+  TEST_ASSERT_EQUAL(HIL_PARSE_INVALID_ARGUMENT, hilParseCommand("HIL 2 PING extra", command));
+  TEST_ASSERT_EQUAL(HIL_PARSE_INVALID_ARGUMENT,
+                    hilParseCommand("HIL 3 REMOTE CONTROL c3 nope 1 0 0", command));
+  TEST_ASSERT_EQUAL(HIL_PARSE_INVALID_SEQUENCE, hilParseCommand("HIL nope PING", command));
+  TEST_ASSERT_EQUAL(HIL_PARSE_UNKNOWN_COMMAND, hilParseCommand("HIL 4 FAN POWER ON", command));
+}
+
+void test_hil_protocol_has_stable_error_names_and_line_limit() {
+  char line[HIL_MAX_LINE_LENGTH + 8] = {};
+  memset(line, 'A', sizeof(line) - 1);
+  HilCommand command = {};
+  TEST_ASSERT_EQUAL(HIL_PARSE_LINE_TOO_LONG, hilParseCommand(line, command));
+  TEST_ASSERT_EQUAL_STRING("line_too_long", hilParseError(HIL_PARSE_LINE_TOO_LONG));
+  TEST_ASSERT_EQUAL_STRING("invalid_prefix", hilParseError(HIL_PARSE_INVALID_PREFIX));
+  TEST_ASSERT_EQUAL_STRING("invalid_sequence", hilParseError(HIL_PARSE_INVALID_SEQUENCE));
+  TEST_ASSERT_EQUAL_STRING("unknown_command", hilParseError(HIL_PARSE_UNKNOWN_COMMAND));
+  TEST_ASSERT_EQUAL_STRING("invalid_argument", hilParseError(HIL_PARSE_INVALID_ARGUMENT));
+}
+
+void test_hil_protocol_parses_status_frame_and_decimal_sensor_value() {
+  HilCommand command = {};
+  TEST_ASSERT_EQUAL(HIL_PARSE_OK, hilParseCommand("HIL 8 STATUS FRAME 5A020100", command));
+  TEST_ASSERT_EQUAL(HIL_COMMAND_STATUS_FRAME, command.type);
+  TEST_ASSERT_EQUAL_STRING("5A020100", command.data);
+
+  TEST_ASSERT_EQUAL(HIL_PARSE_OK, hilParseCommand("HIL 9 SENSOR MCU VALUE 43.25", command));
+  TEST_ASSERT_EQUAL(HIL_COMMAND_SENSOR_VALUE, command.type);
+  TEST_ASSERT_EQUAL_STRING("MCU", command.text);
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 43.25f, command.realValues[0]);
+  TEST_ASSERT_EQUAL(HIL_PARSE_OK, hilParseCommand("HIL 10 SENSOR BMP280 FAULT", command));
+  TEST_ASSERT_EQUAL(HIL_COMMAND_SENSOR_FAULT, command.type);
+}
+
+void test_hil_safety_uses_neutral_pwm_while_locked() {
+  HilOutputGate gate = hilInitialOutputGate(76);
+  TEST_ASSERT_FALSE(gate.unlocked);
+  hilSetExpectedPwm(gate, 102);
+  TEST_ASSERT_EQUAL_INT16(102, gate.expectedPwm);
+  TEST_ASSERT_EQUAL_INT16(76, hilActualPwm(gate));
+  hilSetOutputsUnlocked(gate, true, 1000);
+  TEST_ASSERT_EQUAL_INT16(102, hilActualPwm(gate));
+  TEST_ASSERT_FALSE(hilApplyOutputWatchdog(gate, 10999, 10000));
+  TEST_ASSERT_TRUE(hilApplyOutputWatchdog(gate, 11000, 10000));
+  TEST_ASSERT_FALSE(gate.unlocked);
+  TEST_ASSERT_EQUAL_INT16(76, hilActualPwm(gate));
+}
+
+void test_receiver_frame_decoder_accepts_v2_and_exposes_wire_fields() {
+  ReceiverControlFrameV2 frame = {};
+  frame.head = CONTROL_PACKET_HEAD;
+  frame.type = CONTROL_PACKET_TYPE;
+  frame.version = CONTROL_PROTOCOL_VERSION;
+  frame.sequence = 321;
+  frame.throttle = -456;
+  frame.speedLevel = 2;
+  frame.buttons = 0x02;
+  frame.flags = CONTROL_FLAG_TAKEOVER_REQUEST;
+  frame.crc = protocolCrc8(reinterpret_cast<const uint8_t *>(&frame), sizeof(frame) - 1);
+
+  ReceiverDecodedControl decoded = {};
+  TEST_ASSERT_EQUAL(RECEIVER_FRAME_OK,
+                    receiverDecodeControlFrame(reinterpret_cast<const uint8_t *>(&frame), sizeof(frame), decoded));
+  TEST_ASSERT_FALSE(decoded.legacy);
+  TEST_ASSERT_TRUE(decoded.hasSequence);
+  TEST_ASSERT_EQUAL_UINT16(321, decoded.sequence);
+  TEST_ASSERT_EQUAL_INT16(-456, decoded.throttle);
+  TEST_ASSERT_EQUAL_UINT8(2, decoded.speedLevel);
+  TEST_ASSERT_EQUAL_UINT8(0x02, decoded.buttons);
+  TEST_ASSERT_EQUAL_UINT8(CONTROL_FLAG_TAKEOVER_REQUEST, decoded.flags);
+}
+
+void test_receiver_frame_decoder_rejects_crc_and_truncated_frames() {
+  ReceiverControlFrameV2 frame = {};
+  frame.head = CONTROL_PACKET_HEAD;
+  frame.type = CONTROL_PACKET_TYPE;
+  frame.version = CONTROL_PROTOCOL_VERSION;
+  frame.crc = 0x55;
+  ReceiverDecodedControl decoded = {};
+  TEST_ASSERT_EQUAL(RECEIVER_FRAME_BAD_CRC,
+                    receiverDecodeControlFrame(reinterpret_cast<const uint8_t *>(&frame), sizeof(frame), decoded));
+  TEST_ASSERT_EQUAL(RECEIVER_FRAME_BAD_LENGTH,
+                    receiverDecodeControlFrame(reinterpret_cast<const uint8_t *>(&frame), sizeof(frame) - 2, decoded));
+}
+
+void test_receiver_frame_decoder_keeps_legacy_packets_migratable() {
+  ReceiverControlFrameV1 frame = {};
+  frame.head = CONTROL_PACKET_HEAD;
+  frame.type = CONTROL_PACKET_TYPE;
+  frame.throttle = 250;
+  frame.speedLevel = 3;
+  frame.buttons = 0;
+  frame.checksum = protocolLegacyChecksum(reinterpret_cast<const uint8_t *>(&frame), sizeof(frame));
+  ReceiverDecodedControl decoded = {};
+  TEST_ASSERT_EQUAL(RECEIVER_FRAME_OK,
+                    receiverDecodeControlFrame(reinterpret_cast<const uint8_t *>(&frame), sizeof(frame), decoded));
+  TEST_ASSERT_TRUE(decoded.legacy);
+  TEST_ASSERT_FALSE(decoded.hasSequence);
+  TEST_ASSERT_EQUAL_INT16(250, decoded.throttle);
+}
+#endif
+
 void setup() {
   UNITY_BEGIN();
   RUN_TEST(test_pwm_mapping_uses_vesc_servo_range);
@@ -681,6 +804,16 @@ void setup() {
   RUN_TEST(test_s3_cw2015_reading_rejects_transient_zero_or_nan_values);
   RUN_TEST(test_s3_bmp280_reading_rejects_transient_zero_or_nan_values);
   RUN_TEST(test_s3_speed_level_from_adc_matches_ladder_ranges);
+#ifdef FAN_CONTROLLER_HIL
+  RUN_TEST(test_hil_protocol_parses_sequence_and_receiver_control);
+  RUN_TEST(test_hil_protocol_rejects_missing_extra_and_invalid_arguments);
+  RUN_TEST(test_hil_protocol_has_stable_error_names_and_line_limit);
+  RUN_TEST(test_hil_protocol_parses_status_frame_and_decimal_sensor_value);
+  RUN_TEST(test_hil_safety_uses_neutral_pwm_while_locked);
+  RUN_TEST(test_receiver_frame_decoder_accepts_v2_and_exposes_wire_fields);
+  RUN_TEST(test_receiver_frame_decoder_rejects_crc_and_truncated_frames);
+  RUN_TEST(test_receiver_frame_decoder_keeps_legacy_packets_migratable);
+#endif
   UNITY_END();
 }
 

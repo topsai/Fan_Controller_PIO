@@ -1,6 +1,11 @@
 .pio/
 .cache/
 compile_commands.json
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+hil/reports/
 
 # SquareLine Studio local/cache artifacts
 tools/ui_projects/**/cache/

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "name": "s3 sensors",
+  "steps": [
+    {"command": "RESET"},
+    {"command": "SENSOR MCU VALUE 43.2"},
+    {"command": "SENSOR BMP280 VALUE 25.0"},
+    {"command": "SENSOR COMPASS VALUE 90.0"},
+    {"command": "SENSOR CW2015 VALUE 4.1"},
+    {"command": "STATUS", "expect": {"outputs_unlocked": false, "sensors.mcu_temperature": 43.2, "sensors.compass_valid": true}},
+    {"command": "SENSOR MCU FAULT"},
+    {"command": "SENSOR MCU PHYSICAL"}
+  ]
+}
